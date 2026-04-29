@@ -22,7 +22,7 @@ export default async function handler(req, res) {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify(req.body),
+      body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
     });
 
     const data = await response.json();
