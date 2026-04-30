@@ -1,21 +1,15 @@
 export default async function handler(req, res) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify(req.body),
   });
 
   const data = await response.json();
-  
-  // Log the full response for debugging
-  console.log('STATUS:', response.status);
-  console.log('BODY:', JSON.stringify(data));
-  
-  return res.status(response.status).json(data);
+  console.log('Anthropic response:', JSON.stringify(data).slice(0, 200));
+  res.status(response.status).json(data);
 }
