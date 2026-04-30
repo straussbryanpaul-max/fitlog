@@ -180,8 +180,8 @@ function CalorieRing({consumed,goal}){
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 0 4px"}}>
       <svg width={180} height={180} viewBox="0 0 180 180">
         <circle cx={90} cy={90} r={R} fill="none" stroke="#1a2535" strokeWidth={stroke}/>
-        {filled>0&&<circle cx={90} cy={90} r={R} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={`${filled} ${norm}`} strokeDashoffset={norm*0.75} strokeLinecap="round" style={{transition:"stroke-dasharray 0.5s ease,stroke 0.4s ease"}}/>}
-        {over&&overArc>0&&<circle cx={90} cy={90} r={R} fill="none" stroke={C.red} strokeWidth={stroke} opacity={0.7} strokeDasharray={`${overArc} ${norm}`} strokeDashoffset={norm*0.75} strokeLinecap="round"/>}
+        {filled>0&&<circle cx={90} cy={90} r={R} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={`${filled} ${norm}`} strokeDashoffset={norm*0.25*-1} strokeLinecap="round" style={{transition:"stroke-dasharray 0.5s ease,stroke 0.4s ease"}}/>}
+        {over&&overArc>0&&<circle cx={90} cy={90} r={R} fill="none" stroke={C.red} strokeWidth={stroke} opacity={0.7} strokeDasharray={`${overArc} ${norm}`} strokeDashoffset={norm*0.25*-1} strokeLinecap="round"/>}
         <text x={90} y={82} textAnchor="middle" fill={color} fontSize={28} fontWeight={700} fontFamily="IBM Plex Mono,monospace" style={{transition:"fill 0.4s"}}>{consumed}</text>
         <text x={90} y={100} textAnchor="middle" fill={C.muted} fontSize={11} fontFamily="IBM Plex Mono,monospace">of {goal} cal</text>
         <text x={90} y={116} textAnchor="middle" fill={over?C.red:C.muted} fontSize={11} fontFamily="IBM Plex Mono,monospace">{over?`${consumed-goal} over`:`${remaining} left`}</text>
