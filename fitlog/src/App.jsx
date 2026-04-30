@@ -399,7 +399,7 @@ Use custom food: {"type":"use_custom_food","name":"string","servings":number,"me
 Trend/analysis question: {"type":"query"}
 Unclear: {"type":"unclear","response":"string"}
 
-IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type. Estimate macros for known foods otherwise.`;
+IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type. IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type. For branded or packaged foods, always look up accurate macros rather than estimating. For generic whole foods (chicken breast, rice, banana etc) estimating is fine.`;
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function FitLog(){
