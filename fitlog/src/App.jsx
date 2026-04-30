@@ -463,7 +463,7 @@ export default function FitLog(){
     const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
     const reply=`✅ ${meal.charAt(0).toUpperCase()+meal.slice(1)} logged!\n  • ${item.quantity} ${item.name}: ${item.calories} cal\n${item.protein_g}g protein · ${item.carbs_g}g carbs · ${item.fat_g}g fat`;
     setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
-    if(promptSave){setSaveFoodPrompt({food:item,meal});}
+    if(promptSave&&!customFoods[item.name.toLowerCase()]){setSaveFoodPrompt({food:item,meal});}
   }
 
   function saveCustomFood(food){
