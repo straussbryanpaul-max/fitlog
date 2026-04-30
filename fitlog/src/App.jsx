@@ -646,9 +646,10 @@ export default function FitLog(){
           reply=`✅ "${match}" logged!\n${items.map(i=>`  • ${i.quantity} ${i.name}: ${i.calories}cal`).join("\n")}\n\n${t.cal}cal | ${t.p}g pro`;
           setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
         } else {
-          reply=Object.keys(templates).length?`No template called "${parsed.name}". Saved: ${Object.keys(templates).join(", ")}`:"No templates saved yet.";
-          setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);
-        }
+        const ans=await callClaudeText(userMsg,context,`You are FitLog, a friendly fitness assistant. You help users log workouts, food, and bodyweight. You can also answer general fitness, nutrition, and health questions conversationally. Keep responses concise and helpful.\n\n${buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap)}`);
+        reply=ans||"I didn't quite get that.";
+        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
+      }
 
       } else {
         reply=parsed.response||"I didn't quite get that.";
