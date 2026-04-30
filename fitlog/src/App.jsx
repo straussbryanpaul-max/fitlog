@@ -719,6 +719,11 @@ export default function FitLog(){
           </div>
         </div>
       )}
+    <div style={{display:"flex",background:C.surface,borderTop:`1px solid ${C.border}`,flexShrink:0,boxShadow:"0 -1px 3px rgba(0,0,0,0.06)",paddingBottom:"env(safe-area-inset-bottom)"}}>
+        {[["chat","Chat"],["dashboard","Today"],["lifts","Lifts"],["foods","Foods"],["charts","Charts"],["settings","⚙"]].map(([id,label])=>(
+          <button key={id} style={tabSt(tab===id)} onClick={()=>setTab(id)}>{label}</button>
+        ))}
+      </div>
     </div>
   );
 }
