@@ -521,11 +521,7 @@ export default function FitLog(){
         logFoodItem(item,parsed.meal||"snack",true);reply=`logged ${item.name}`;
 
       }else if(parsed.type==="nutrition"){
-        const entry={date:today(),timestamp:Date.now(),meal:parsed.meal,items:parsed.items};
-        const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
-        const t=parsed.items.reduce((a,i)=>({cal:a.cal+(i.calories||0),p:a.p+(i.protein_g||0),c:a.c+(i.carbs_g||0),f:a.f+(i.fat_g||0)}),{cal:0,p:0,c:0,f:0});
-        reply=`✅ ${parsed.meal.charAt(0).toUpperCase()+parsed.meal.slice(1)} logged!\n${parsed.items.map(i=>`  • ${i.quantity} ${i.name}: ${i.calories} cal`).join("\n")}\n\nTotal: ${t.cal} cal | ${t.p}g protein | ${t.c}g carbs | ${t.f}g fat`;
-        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
+        parsed.items.forEach(item=>logFoodItem(item,parsed.meal,true));reply=`logged`;
 
       }else if(parsed.type==="use_custom_food"){
         const key=(parsed.name||"").toLowerCase();
