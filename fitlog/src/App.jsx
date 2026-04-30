@@ -373,14 +373,14 @@ async function callClaudeText(userMessage,context,systemPrompt){
       "Content-Type":"application/json",
       "anthropic-version":"2023-06-01"
     },
-    body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:1000,system:systemPrompt,messages:[...context,{role:"user",content:userMessage}]})
+    body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,system:systemPrompt,messages:[...context,{role:"user",content:userMessage}]})
   });
   const data=await res.json();
   return data.content?.map(b=>b.text||"").join("")||"";
 }
 
 async function callClaudeImage(base64,mediaType){
-  const res=await fetch("/api/anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string"}\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
+  const res=await fetch("/api/anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string"}\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
   const data=await res.json();
   const text=data.content?.map(b=>b.text||"").join("")||"{}";
   try{return JSON.parse(text.replace(/```json|```/g,"").trim());}
