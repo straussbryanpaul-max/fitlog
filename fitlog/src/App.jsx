@@ -329,7 +329,6 @@ async function callClaudeText(userMessage,context,systemPrompt){
     method:"POST",
     headers:{
       "Content-Type":"application/json",
-      "x-api-key":"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",
       "anthropic-version":"2023-06-01"
     },
     body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,system:systemPrompt,messages:[...context,{role:"user",content:userMessage}]})
