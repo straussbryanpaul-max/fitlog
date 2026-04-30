@@ -521,7 +521,7 @@ export default function FitLog(){
         logFoodItem(item,parsed.meal||"snack",true);reply=`logged ${item.name}`;
 
       }else if(parsed.type==="nutrition"){
-        parsed.items.forEach(item=>logFoodItem(item,parsed.meal,true));reply=`logged`;
+        parsed.items.forEach((item,idx)=>logFoodItem(item,parsed.meal,idx===0));reply=``;
 
       }else if(parsed.type==="use_custom_food"){
         const key=(parsed.name||"").toLowerCase();
