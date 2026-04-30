@@ -48,6 +48,50 @@ const rowSt={display:"flex",justifyContent:"space-between",alignItems:"center",f
 const inp={background:"#111827",border:`1px solid ${C.border}`,borderRadius:10,padding:"9px 12px",color:C.text,fontSize:13,fontFamily:"inherit",outline:"none",width:"100%",boxSizing:"border-box"};
 function progressColor(pct){if(pct>=105)return C.red;if(pct>=90)return C.amber;return C.green;}
 
+// ── Delete button ─────────────────────────────────────────────────────────────
+function DeleteBtn({ onDelete, style = {} }) {
+  const [confirming, setConfirming] = useState(false);
+  const timerRef = useRef(null);
+
+  function handleClick(e) {
+    e.stopPropagation();
+    if (confirming) {
+      clearTimeout(timerRef.current);
+      setConfirming(false);
+      onDelete();
+    } else {
+      setConfirming(true);
+      timerRef.current = setTimeout(() => setConfirming(false), 2500);
+    }
+  }
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <button
+      onClick={handleClick}
+      title={confirming ? "Tap again to confirm" : "Delete"}
+      style={{
+        background: confirming ? C.red : "none",
+        border: `1px solid ${confirming ? C.red : C.border}`,
+        borderRadius: 6,
+        padding: "3px 8px",
+        color: confirming ? "#fff" : C.muted,
+        fontSize: 11,
+        fontFamily: "inherit",
+        fontWeight: confirming ? 700 : 400,
+        cursor: "pointer",
+        flexShrink: 0,
+        transition: "all 0.15s",
+        whiteSpace: "nowrap",
+        ...style,
+      }}
+    >
+      {confirming ? "confirm?" : "✕"}
+    </button>
+  );
+}
+
 // ── Confirm label scan before logging ────────────────────────────────────────
 function LabelConfirmModal({scanned, onConfirm, onCancel}){
   const[servings,setServings]=useState("1");
@@ -232,7 +276,7 @@ function FoodsTab({customFoods, onDelete, onLog}){
 }
 
 // ── Lifts tab ────────────────────────────────────────────────────────────────
-function LiftsTab({workouts,exerciseMap}){
+function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet}){
   const[search,setSearch]=useState("");
   const[selected,setSelected]=useState(null);
   function resolveEx(raw){const l=raw.toLowerCase().trim();return exerciseMap[l]||HARD_ALIASES[l]||l;}
@@ -289,7 +333,8 @@ function LiftsTab({workouts,exerciseMap}){
             {[...sel.sessions].reverse().map((s,i)=>(
               <div key={i} style={{...rowSt,fontSize:12}}>
                 <span style={{color:C.muted}}>{shortDate(s.date)}</span>
-                <span>{s.sets}×{s.reps} @ <span style={{color:s.weight===best?C.amber:C.accent,fontWeight:700}}>{s.weight} lbs</span>{s.weight===best&&<span style={{fontSize:9,color:C.amber,marginLeft:4}}>★ PR</span>}</span>
+                <span style={{flex:1,marginLeft:8}}>{s.sets}×{s.reps} @ <span style={{color:s.weight===best?C.amber:C.accent,fontWeight:700}}>{s.weight} lbs</span>{s.weight===best&&<span style={{fontSize:9,color:C.amber,marginLeft:4}}>★ PR</span>}</span>
+                <DeleteBtn onDelete={()=>{onDeleteSet(s.date,selected);if(sel.sessions.length<=1)setSelected(null);}} style={{marginLeft:8}}/>
               </div>
             ))}
           </div>
@@ -404,6 +449,47 @@ export default function FitLog(){
   function resolveEx(raw,map=exerciseMap){const l=raw.toLowerCase().trim();return map[l]||HARD_ALIASES[l]||l;}
   function getKnownExercises(map=exerciseMap){const s=new Set();workouts.forEach(w=>w.sets.forEach(x=>s.add(resolveEx(x.exercise,map))));return[...s];}
 
+  // ── Delete handlers ──────────────────────────────────────────────────────────
+
+  // Delete an entire nutrition entry by its timestamp
+  function deleteNutritionEntry(timestamp) {
+    const updated = nutrition.filter(n => n.timestamp !== timestamp);
+    setNutrition(updated);
+    save(STORAGE_KEYS.nutrition, updated);
+  }
+
+  // Delete a single food item from a nutrition entry; removes entry if it becomes empty
+  function deleteNutritionItem(entryTimestamp, itemIndex) {
+    const updated = nutrition.map(n => {
+      if (n.timestamp !== entryTimestamp) return n;
+      const newItems = n.items.filter((_, i) => i !== itemIndex);
+      return { ...n, items: newItems };
+    }).filter(n => n.items.length > 0);
+    setNutrition(updated);
+    save(STORAGE_KEYS.nutrition, updated);
+  }
+
+  // Delete an entire workout entry by its timestamp
+  function deleteWorkoutEntry(timestamp) {
+    const updated = workouts.filter(w => w.timestamp !== timestamp);
+    setWorkouts(updated);
+    save(STORAGE_KEYS.workouts, updated);
+  }
+
+  // Delete a specific set from a workout entry (by date + exercise name); cleans up empty workouts
+  function deleteWorkoutSet(date, exerciseName) {
+    const updated = workouts.map(w => {
+      if (w.date !== date) return w;
+      const newSets = w.sets.filter(s => {
+        const resolved = resolveEx(s.exercise);
+        return resolved !== exerciseName && s.exercise.toLowerCase().trim() !== exerciseName;
+      });
+      return { ...w, sets: newSets };
+    }).filter(w => w.sets.length > 0);
+    setWorkouts(updated);
+    save(STORAGE_KEYS.workouts, updated);
+  }
+
   function commitWorkout(sets){
     const entry={date:today(),timestamp:Date.now(),sets};
     const u=[...workouts,entry];setWorkouts(u);save(STORAGE_KEYS.workouts,u);
@@ -438,7 +524,6 @@ export default function FitLog(){
     processExQueue(remainingQueue,[...resolvedSets,{...set,exercise:incoming}],nm);
   }
 
-  // Log a food item — optionally prompt to save to custom foods
   function logFoodItem(item, meal, promptSave=false){
     const entry={date:today(),timestamp:Date.now(),meal,items:[item]};
     const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
@@ -457,7 +542,6 @@ export default function FitLog(){
     setSaveFoodPrompt(null);
   }
 
-  // Handle label image upload
   async function handleImageUpload(e){
     const file=e.target.files?.[0];
     if(!file)return;
@@ -468,7 +552,7 @@ export default function FitLog(){
       const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
       const scanned=await callClaudeImage(base64,file.type||"image/jpeg");
       if(scanned&&scanned.calories){
-        setMessages(prev=>[...prev.slice(0,-1)]);// remove "scanning" msg
+        setMessages(prev=>[...prev.slice(0,-1)]);
         setLabelModal(scanned);
       } else {
         setMessages(prev=>[...prev.slice(0,-1),{role:"assistant",content:"I couldn't read that label clearly. Try a closer, well-lit photo.",type:"unclear"}]);
@@ -510,7 +594,6 @@ export default function FitLog(){
         reply="Workout processed.";
 
       } else if(parsed.type==="nutrition_known"){
-        // User specified macros inline — log with exact values, offer to save
         const item={
           name:parsed.name,
           calories:Math.round(parsed.calories*(parsed.servings||1)),
@@ -628,9 +711,7 @@ export default function FitLog(){
           <div ref={bottomRef}/>
         </div>
         <div style={{padding:"10px 14px 18px",display:"flex",gap:8,background:C.bg,borderTop:`1px solid ${C.border}`,flexShrink:0,alignItems:"center"}}>
-          {/* Hidden file input */}
           <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleImageUpload}/>
-          {/* Camera button */}
           <button
             style={{background:"#111827",border:`1px solid ${C.border}`,borderRadius:10,width:42,height:42,cursor:"pointer",fontSize:18,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}
             onClick={()=>fileRef.current?.click()}
@@ -652,30 +733,72 @@ export default function FitLog(){
               <button style={{background:C.accent,border:"none",borderRadius:10,padding:"9px 14px",color:C.bg,fontWeight:700,fontFamily:"inherit",fontSize:13,cursor:"pointer"}} onClick={()=>{doLogBW(bwInput);setBwInput("");}}>Log</button>
             </div>
           </div>
+
+          {/* Today's Workout with delete */}
           <div style={card}>
             <div style={ctitle}>Today's Workout</div>
-            {todayWork.length===0?<div style={{fontSize:13,color:C.muted}}>No workout logged yet.</div>
-              :todayWork.flatMap(w=>w.sets).map((s,i)=>(
-                <div key={i} style={{...rowSt,cursor:"pointer"}} onClick={()=>setTab("lifts")}>
-                  <span style={{textTransform:"capitalize",color:C.accent,textDecoration:"underline",textDecorationStyle:"dotted"}}>{s.exercise}</span>
-                  <span style={{color:C.text,fontWeight:600}}>{s.sets}×{s.reps} @ {s.weight}{s.unit}</span>
-                </div>
-              ))}
+            {todayWork.length===0
+              ? <div style={{fontSize:13,color:C.muted}}>No workout logged yet.</div>
+              : todayWork.map((workout, wi) => (
+                  <div key={workout.timestamp||wi}>
+                    {workout.sets.map((s, si) => (
+                      <div key={si} style={{...rowSt,gap:8}}>
+                        <span
+                          style={{textTransform:"capitalize",color:C.accent,textDecoration:"underline",textDecorationStyle:"dotted",cursor:"pointer",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}
+                          onClick={()=>setTab("lifts")}
+                        >{s.exercise}</span>
+                        <span style={{color:C.text,fontWeight:600,flexShrink:0}}>{s.sets}×{s.reps} @ {s.weight}{s.unit}</span>
+                        <DeleteBtn
+                          onDelete={()=>deleteWorkoutEntry(workout.timestamp)}
+                          style={{marginLeft:4}}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ))
+            }
           </div>
+
+          {/* Today's Meals with per-item delete */}
           <div style={card}>
             <div style={ctitle}>Today's Meals</div>
-            {todayNut.length===0?<div style={{fontSize:13,color:C.muted}}>No food logged yet.</div>
-              :todayNut.map((entry,i)=>(
-                <div key={i} style={{marginBottom:8}}>
-                  <div style={{fontSize:10,color:C.muted,textTransform:"capitalize",marginBottom:3}}>{entry.meal}</div>
-                  {entry.items.map((item,j)=>(<div key={j} style={{...rowSt,fontSize:12}}><span>{item.quantity} {item.name}</span><span style={{color:C.amber,fontWeight:600}}>{item.calories}cal</span></div>))}
-                </div>
-              ))}
+            {todayNut.length===0
+              ? <div style={{fontSize:13,color:C.muted}}>No food logged yet.</div>
+              : todayNut.map((entry, ei) => (
+                  <div key={entry.timestamp||ei} style={{marginBottom:10}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                      <div style={{fontSize:10,color:C.muted,textTransform:"capitalize"}}>{entry.meal}</div>
+                      {entry.items.length > 1 && (
+                        <DeleteBtn
+                          onDelete={()=>deleteNutritionEntry(entry.timestamp)}
+                          style={{fontSize:9,padding:"2px 6px"}}
+                        />
+                      )}
+                    </div>
+                    {entry.items.map((item, ii) => (
+                      <div key={ii} style={{...rowSt,fontSize:12,gap:8}}>
+                        <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.quantity} {item.name}</span>
+                        <span style={{color:C.amber,fontWeight:600,flexShrink:0}}>{item.calories}cal</span>
+                        <DeleteBtn
+                          onDelete={()=>deleteNutritionItem(entry.timestamp, ii)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ))
+            }
           </div>
         </div>
       )}
 
-      {tab==="lifts"&&<LiftsTab workouts={workouts} exerciseMap={exerciseMap}/>}
+      {tab==="lifts"&&(
+        <LiftsTab
+          workouts={workouts}
+          exerciseMap={exerciseMap}
+          onDeleteWorkout={deleteWorkoutEntry}
+          onDeleteSet={deleteWorkoutSet}
+        />
+      )}
 
       {tab==="foods"&&(
         <FoodsTab
