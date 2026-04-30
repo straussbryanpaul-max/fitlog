@@ -316,6 +316,7 @@ function LiftsTab({workouts,exerciseMap}){
   );
 }
 
+
 // ── Claude API calls ──────────────────────────────────────────────────────────
 function buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap){
   function res(raw){const l=raw.toLowerCase().trim();return exerciseMap[l]||HARD_ALIASES[l]||l;}
