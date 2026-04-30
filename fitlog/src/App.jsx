@@ -652,8 +652,9 @@ export default function FitLog(){
       }
 
       } else {
-        reply=parsed.response||"I didn't quite get that.";
-        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);
+        const ans=await callClaudeText(userMsg,context,`You are FitLog, a friendly fitness assistant. You help users log workouts, food, and bodyweight. You can also answer general fitness, nutrition, and health questions conversationally. Keep responses concise and helpful.\n\n${buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap)}`);
+        reply=ans||"Sorry, something went wrong.";
+        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
       }
 
       nc.push({role:"assistant",content:reply});setContext(nc.slice(-10));
