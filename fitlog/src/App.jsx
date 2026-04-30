@@ -225,7 +225,7 @@ function FoodsTab({customFoods,onDelete,onLog}){
   const foods=Object.values(customFoods);
   const filtered=search.trim()?foods.filter(f=>f.name.toLowerCase().includes(search.toLowerCase())):foods;
   return(
-   
+   <div style={{flex:1,overflowY:"auto",padding:16}}>
       <div style={{position:"relative",marginBottom:16}}>
         <input style={{...inp,paddingLeft:42}} placeholder="Search foods..." value={search} onChange={e=>setSearch(e.target.value)}/>
         <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",color:C.mutedLight,fontSize:16}}>🔍</span>
