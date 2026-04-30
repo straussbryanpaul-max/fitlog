@@ -359,11 +359,11 @@ function buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap){
   return`GOALS: ${goals.calories}cal | ${goals.protein_g}g protein\nEXERCISES:\n${Object.entries(exS).map(([n,s])=>{const sorted=s.sort((a,b)=>a.date.localeCompare(b.date));const best=Math.max(...s.map(x=>x.weight));const lat=sorted[sorted.length-1];return`- ${n}: ${s.length} sessions, best=${best}lbs, latest=${lat.weight}lbs on ${lat.date}`;}).join("\n")}\nNUTRITION:\n${Object.entries(nutD).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14).map(([d,x])=>`- ${d}: ${Math.round(x.calories)}cal | ${Math.round(x.protein_g)}g pro`).join("\n")}\nBODYWEIGHT:\n${bodyweight.slice(-14).map(b=>`- ${b.date}: ${b.weight}lbs`).join("\n")||"No data"}`;
 }
 
-async function callClaudeText(userMessage,context,systemPrompt){
+async function callClaudeText(userMessage,context,systemPrompt,useWebSearch=false){
   const res=await fetch("/api/anthropic",{
     method:"POST",
     headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01"},
-    body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,system:systemPrompt,messages:[...context,{role:"user",content:userMessage}],tools:[{"type":"web_search_20250305","name":"web_search"}]})
+    body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,system:systemPrompt,messages:[...context,{role:"user",content:userMessage}],...(useWebSearch?{tools:[{"type":"web_search_20250305","name":"web_search"}]}:{})})
   });
   const data=await res.json();
   return data.content?.map(b=>b.text||"").join("")||"";
@@ -507,7 +507,7 @@ export default function FitLog(){
       let reply="";
 
       if(parsed.type==="query"){
-        const ans=await callClaudeText(userMsg,context,`You are FitLog, a personal fitness coach. Answer using the user's real data — specific numbers and dates. Concise plain text only.\n\n${buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap)}`);
+        const ans=await callClaudeText(userMsg,context,`You are FitLog, a personal fitness coach. Answer using the user's real data — specific numbers and dates. Concise plain text only.\n\n${buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap)}`, true);
         reply=ans||"Not enough data yet.";
         setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
 
