@@ -586,7 +586,7 @@ export default function FitLog(){
   const aiBubble=t=>({alignSelf:"flex-start",background:t==="workout"?C.greenLight:t==="nutrition"?C.amberLight:t==="bodyweight"?C.accentLight:C.surface,border:`1px solid ${t==="workout"?C.green:t==="nutrition"?C.amber:t==="bodyweight"?C.accent:C.border}`,borderRadius:"18px 18px 18px 4px",padding:"12px 16px",maxWidth:"86%",fontSize:15,whiteSpace:"pre-wrap",lineHeight:1.7,color:C.text,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"});
 
   return(
-    <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:C.bg,color:C.text,minHeight:"100vh",display:"flex",flexDirection:"column",maxWidth:480,margin:"0 auto"}}>
+    <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:C.bg,color:C.text,height:"100svh",display:"flex",flexDirection:"column",overflow:"hidden",maxWidth:480,margin:"0 auto"}}>
       {confirmModal&&<ExerciseConfirmModal incoming={confirmModal.incoming} existing={confirmModal.existing} onSame={handleSameEx} onDifferent={handleDiffEx}/>}
       {labelModal&&<LabelConfirmModal scanned={labelModal} onConfirm={handleLabelConfirm} onCancel={()=>setLabelModal(null)}/>}
 
