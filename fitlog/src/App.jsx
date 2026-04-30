@@ -326,7 +326,7 @@ function buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap){
 }
 
 async function callClaudeText(userMessage,context,systemPrompt){
-  const res=await fetch("/api.anthropic",{
+  const res=await fetch("/api/anthropic",{
     method:"POST",
     headers:{
       "Content-Type":"application/json",
@@ -339,7 +339,7 @@ async function callClaudeText(userMessage,context,systemPrompt){
 }
 
 async function callClaudeImage(base64,mediaType){
-  const res=await fetch("/api.anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string"}\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
+  const res=await fetch("/api/anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string"}\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
   const data=await res.json();
   const text=data.content?.map(b=>b.text||"").join("")||"{}";
   try{return JSON.parse(text.replace(/```json|```/g,"").trim());}
