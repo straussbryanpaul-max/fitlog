@@ -590,13 +590,8 @@ export default function FitLog(){
       {confirmModal&&<ExerciseConfirmModal incoming={confirmModal.incoming} existing={confirmModal.existing} onSame={handleSameEx} onDifferent={handleDiffEx}/>}
       {labelModal&&<LabelConfirmModal scanned={labelModal} onConfirm={handleLabelConfirm} onCancel={()=>setLabelModal(null)}/>}
 
-      <div style={{padding:"16px 18px 0",background:C.surface,borderBottom:`1px solid ${C.border}`,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
-        <p style={{fontSize:20,fontWeight:800,color:C.text,margin:"0 0 14px",letterSpacing:"-0.02em"}}>⚡ FitLog</p>
-        <div style={{display:"flex"}}>
-          {[["chat","Chat"],["dashboard","Today"],["lifts","Lifts"],["foods","Foods"],["charts","Charts"],["settings","⚙"]].map(([id,label])=>(
-            <button key={id} style={tabSt(tab===id)} onClick={()=>setTab(id)}>{label}</button>
-          ))}
-        </div>
+      <div style={{padding:"16px 18px 12px",background:C.surface,borderBottom:`1px solid ${C.border}`,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
+        <p style={{fontSize:20,fontWeight:800,color:C.text,margin:0,letterSpacing:"-0.02em"}}>⚡ FitLog</p>
       </div>
 
       {tab==="chat"&&(<>
