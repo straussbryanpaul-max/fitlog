@@ -322,7 +322,7 @@ function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet}){
                   <XAxis dataKey="date" tick={{fill:C.muted,fontSize:10}} axisLine={false} tickLine={false}/>
                   <YAxis tick={{fill:C.muted,fontSize:10}} domain={["auto","auto"]} axisLine={false} tickLine={false}/>
                   <Tooltip content={({active,payload,label})=>{if(!active||!payload?.length)return null;const d=payload[0].payload;return<div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 12px",fontSize:11}}><div style={{color:C.muted,marginBottom:4}}>{label}</div><div style={{color:C.amber}}>{d.weight} lbs</div><div style={{color:C.text}}>{d.sets}×{d.reps}</div></div>;}}/>
-                  <Bar dataKey="weight" radius={[4,4,0,0]} label={<RepLabel/>}>{chartData.map((e,i)=><Cell key={i} fill={e.weight===best?C.amber:C.accent} opacity={0.85}/>)}</Bar>
+                  <Bar dataKey="weight" radius={[4,4,0,0]} label={<RepLabel data={chartData}/>}>{chartData.map((e,i)=><Cell key={i} fill={e.weight===best?C.amber:C.accent} opacity={0.85}/>)}</Bar>
                 </BarChart>
               </ResponsiveContainer>
               <div style={{fontSize:10,color:C.muted,textAlign:"center",marginTop:4}}>Bar = weight · number above = reps · <span style={{color:C.amber}}>gold = PR</span></div>
