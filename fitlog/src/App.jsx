@@ -440,7 +440,7 @@ export default function FitLog(){
   function deleteWorkoutSet(date,exerciseName){const updated=workouts.map(w=>{if(w.date!==date)return w;const newSets=w.sets.filter(s=>{const resolved=resolveEx(s.exercise);return resolved!==exerciseName&&s.exercise.toLowerCase().trim()!==exerciseName;});return{...w,sets:newSets};}).filter(w=>w.sets.length>0);setWorkouts(updated);save(STORAGE_KEYS.workouts,updated);}
 
   function commitWorkout(sets){
-    const entry={date:today(),timestamp:Date.now(),sets};
+    const entry={date:selectedDate,timestamp:Date.now(),sets};
     const u=[...workouts,entry];setWorkouts(u);save(STORAGE_KEYS.workouts,u);
     const reply=`✅ Workout logged!\n${sets.map(s=>`  • ${s.exercise}: ${s.sets}×${s.reps} @ ${s.weight}${s.unit}`).join("\n")}`;
     setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"workout"}]);
@@ -459,7 +459,7 @@ export default function FitLog(){
   function handleDiffEx(){if(!confirmModal)return;const{incoming,set,remainingQueue,resolvedSets,currentMap}=confirmModal;const nm={...currentMap,[incoming]:incoming};setExerciseMap(nm);save(STORAGE_KEYS.exerciseMap,nm);processExQueue(remainingQueue,[...resolvedSets,{...set,exercise:incoming}],nm);}
 
   function logFoodItem(item,meal,promptSave=false){
-    const entry={date:today(),timestamp:Date.now(),meal,items:[item]};
+    const entry={date:selectedDate,timestamp:Date.now(),meal,items:[item]};
     const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
     const reply=`✅ ${meal.charAt(0).toUpperCase()+meal.slice(1)} logged!\n  • ${item.quantity} ${item.name}: ${item.calories} cal\n${item.protein_g}g protein · ${item.carbs_g}g carbs · ${item.fat_g}g fat`;
     setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
@@ -548,7 +548,7 @@ export default function FitLog(){
         if(match){
           const tmpl=templates[match];const mult=parsed.servings||1;
           const items=tmpl.items.map(i=>({...i,calories:Math.round(i.calories*mult),protein_g:Math.round(i.protein_g*mult),carbs_g:Math.round(i.carbs_g*mult),fat_g:Math.round(i.fat_g*mult)}));
-          const entry={date:today(),timestamp:Date.now(),meal:tmpl.meal,items};
+          const entry={date:selectedDate,timestamp:Date.now(),meal:tmpl.meal,items};
           const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
           const t=items.reduce((a,i)=>({cal:a.cal+(i.calories||0),p:a.p+(i.protein_g||0)}),{cal:0,p:0});
           reply=`✅ "${match}" logged!\n${items.map(i=>`  • ${i.quantity} ${i.name}: ${i.calories} cal`).join("\n")}\n\n${t.cal} cal | ${t.p}g protein`;
@@ -595,7 +595,7 @@ export default function FitLog(){
       </div>
 
       {tab==="chat"&&(<>
-        <div style={{flex:1,overflowY:"auto",padding:"14px 14px 0",display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{flex:1,overflowY:"auto",padding:"14px 14px 0",display:"flex",flexDirection:"column",gap:10}}>           {selectedDate!==today()&&<div style={{background:C.amberLight,border:`1px solid ${C.amber}`,borderRadius:12,padding:"10px 14px",fontSize:13,color:C.amber,fontWeight:600,textAlign:"center"}}>Logging to {selectedDate} — <span style={{cursor:"pointer",textDecoration:"underline"}} onClick={()=>setSelectedDate(today())}>switch to today</span></div>}
           {messages.map((m,i)=>m.role==="user"
             ?<div key={i} style={{alignSelf:"flex-end",background:C.accent,color:"#fff",borderRadius:"18px 18px 4px 18px",padding:"12px 16px",maxWidth:"80%",fontSize:15,fontWeight:500,whiteSpace:"pre-wrap",lineHeight:1.5}}>{m.content}</div>
             :<div key={i} style={aiBubble(m.type)}>{m.content}</div>
@@ -676,7 +676,7 @@ export default function FitLog(){
           customFoods={customFoods}
           onDelete={name=>{const u={...customFoods};delete u[name.toLowerCase()];setCustomFoods(u);save(STORAGE_KEYS.customFoods,u);}}
           onLog={food=>{
-            const entry={date:today(),timestamp:Date.now(),meal:"snack",items:[{...food,quantity:"1 serving"}]};
+            const entry={date:selectedDate,timestamp:Date.now(),meal:"snack",items:[{...food,quantity:"1 serving"}]};
             const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
             setTab("chat");
             setMessages(prev=>[...prev,{role:"assistant",content:`✅ ${food.name} logged!\n${food.calories} cal | ${food.protein_g}g protein | ${food.carbs_g}g carbs | ${food.fat_g}g fat`,type:"nutrition"}]);
