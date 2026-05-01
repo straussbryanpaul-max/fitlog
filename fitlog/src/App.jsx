@@ -686,14 +686,7 @@ export default function FitLog(){
 
       {tab==="charts"&&(
         <div style={{flex:1,overflowY:"auto",padding:16}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-            <button onClick={()=>setWeekOffset(w=>w+1)} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 14px",fontSize:16,cursor:"pointer"}}>←</button>
-            {weekOffset>0
-              ?<button onClick={()=>setWeekOffset(0)} style={{background:C.accentLight,border:`1px solid ${C.accent}`,borderRadius:10,padding:"8px 14px",fontSize:13,color:C.accent,fontWeight:700,fontFamily:"inherit",cursor:"pointer"}}>This Week</button>
-              :<div style={{fontSize:13,color:C.muted,fontWeight:600}}>This Week</div>
-            }
-            <button onClick={()=>setWeekOffset(w=>Math.max(0,w-1))} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 14px",fontSize:16,cursor:"pointer",opacity:weekOffset===0?0.3:1}}>→</button>
-          </div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><button onClick={()=>setWeekOffset(w=>w+1)} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 14px",fontSize:16,cursor:"pointer"}}>←</button>{weekOffset>0?<button onClick={()=>setWeekOffset(0)} style={{background:C.accentLight,border:`1px solid ${C.accent}`,borderRadius:10,padding:"8px 14px",fontSize:13,color:C.accent,fontWeight:700,fontFamily:"inherit",cursor:"pointer"}}>This Week</button>:<div style={{fontSize:13,color:C.muted,fontWeight:600}}>This Week</div>}<button onClick={()=>setWeekOffset(w=>Math.max(0,w-1))} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 14px",fontSize:16,cursor:"pointer",opacity:weekOffset===0?0.3:1}}>→</button></div>
           {[{title:"Calories — Last 7 Days",data:wkCal,dKey:"cal",name:"Calories",color:C.amber},{title:"Protein — Last 7 Days",data:wkPro,dKey:"protein",name:"Protein (g)",color:C.accent},{title:"Workout Volume — Last 7 Days",data:wkVol,dKey:"volume",name:"Volume (lbs)",color:C.green}].map(({title,data,dKey,name,color})=>(
             <div key={title} style={card}><div style={ctitle}>{title}</div>
               <ResponsiveContainer width="100%" height={160}><BarChart data={data} margin={{top:4,right:4,left:-20,bottom:0}}><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="date" tick={{fill:C.muted,fontSize:11}}/><YAxis tick={{fill:C.muted,fontSize:11}}/><Tooltip content={<CustomTooltip/>}/><Bar dataKey={dKey} name={name} fill={color} radius={[5,5,0,0]} opacity={0.85}/></BarChart></ResponsiveContainer>
