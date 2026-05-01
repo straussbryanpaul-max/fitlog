@@ -409,7 +409,7 @@ export default function FitLog(){
   const[draftSplit,setDraftSplit]=useState(DEFAULT_GOALS.carbFatSplit);
   const[loading,setLoading]=useState(false);
   const[context,setContext]=useState([]);
-  const[bwInput,setBwInput]=useState("");
+  const[bwInput,setBwInput]=useState("");   const[selectedDate,setSelectedDate]=useState(today());
   const[savedFlash,setSavedFlash]=useState(false);
   const[confirmModal,setConfirmModal]=useState(null);
   const[labelModal,setLabelModal]=useState(null);
@@ -578,8 +578,8 @@ export default function FitLog(){
   const previewC=Math.max(0,parseInt(draftCals)||0),previewP=Math.max(0,parseInt(draftPro)||0);
   const previewD=calcMacros(previewC,previewP,draftSplit);
   const proteinCals=previewP*4,remainCals=Math.max(0,previewC-proteinCals),proteinPct=previewC>0?Math.round((proteinCals/previewC)*100):0;
-  const todayNut=nutrition.filter(n=>n.date===today());
-  const todayWork=workouts.filter(w=>w.date===today());
+  const todayNut=nutrition.filter(n=>n.date===selectedDate);
+  const todayWork=workouts.filter(w=>w.date===selectedDate);
   const todayMacros=todayNut.reduce((acc,e)=>{e.items.forEach(i=>{acc.calories+=i.calories||0;acc.protein_g+=i.protein_g||0;acc.carbs_g+=i.carbs_g||0;acc.fat_g+=i.fat_g||0;});return acc;},{calories:0,protein_g:0,carbs_g:0,fat_g:0});
 
   const tabSt=a=>({flex:1,padding:"11px 0",background:"none",border:"none",borderBottom:a?`2px solid ${C.accent}`:"2px solid transparent",color:a?C.accent:C.muted,cursor:"pointer",fontSize:10,fontWeight:700,fontFamily:"inherit",letterSpacing:"0.04em",textTransform:"uppercase",transition:"all 0.15s"});
@@ -614,7 +614,7 @@ export default function FitLog(){
 
       {tab==="dashboard"&&(
         <div style={{flex:1,overflowY:"auto",padding:16}}>
-          <div style={{...card,textAlign:"center"}}><div style={ctitle}>Calories Today</div><CalorieRing consumed={Math.round(todayMacros.calories)} goal={goals.calories}/></div>
+          <div style={{...card,textAlign:"center"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>             <div style={ctitle}>Calories Today</div>             <input type="date" value={selectedDate} max={today()} onChange={e=>setSelectedDate(e.target.value)} style={{fontSize:13,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 8px",background:C.bg,fontFamily:"inherit"}}/>           </div><CalorieRing consumed={Math.round(todayMacros.calories)} goal={goals.calories}/></div>
           <div style={card}>
             <div style={ctitle}>Macros</div>
             <MacroBar label="Protein" value={todayMacros.protein_g} goal={goals.protein_g} color={C.accent}/>
