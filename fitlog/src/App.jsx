@@ -13,7 +13,7 @@ const STORAGE_KEYS = {
 
 const DEFAULT_GOALS = { calories: 2200, protein_g: 160, carbs_g: 220, fat_g: 70, carbFatSplit: 60 };
 
-const today = () => new Date().toISOString().split("T")[0];
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const last7Days = () => { const d=[]; for(let i=6;i>=0;i--){const x=new Date();x.setDate(x.getDate()-i);d.push(x.toISOString().split("T")[0]);}return d; };
 const shortDate = iso => { const dt=new Date(iso+"T12:00:00"); return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][dt.getMonth()]} ${dt.getDate()}`; };
 function calcMacros(calories,protein_g,carbPct){const rem=Math.max(0,calories-protein_g*4);return{carbs_g:Math.round(rem*(carbPct/100)/4),fat_g:Math.round(rem*((100-carbPct)/100)/9)};}
