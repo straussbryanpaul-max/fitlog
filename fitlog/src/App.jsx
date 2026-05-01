@@ -410,7 +410,7 @@ export default function FitLog(){
   const[loading,setLoading]=useState(false);
   const[context,setContext]=useState([]);
   const[bwInput,setBwInput]=useState("");   const[selectedDate,setSelectedDate]=useState(today());
-  const[savedFlash,setSavedFlash]=useState(false);   const[weekOffset,setWeekOffset]=useState(0);   const[weekOffset,setWeekOffset]=useState(0);
+  const[savedFlash,setSavedFlash]=useState(false);   const[weekOffset,setWeekOffset]=useState(0);
   const[confirmModal,setConfirmModal]=useState(null);
   const[labelModal,setLabelModal]=useState(null);
   const[saveFoodPrompt,setSaveFoodPrompt]=useState(null);
