@@ -389,7 +389,7 @@ async function callClaudeText(userMessage,context,systemPrompt,useWebSearch=fals
 }
 
 async function callClaudeImage(base64,mediaType){
-  const res=await fetch("/api/anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string"}\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
+  const res=await fetch("/api/anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string","servingUnit":"string","servingAmount":number}\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
   const data=await res.json();
   const text=data.content?.map(b=>b.text||"").join("")||"{}";
   try{return JSON.parse(text.replace(/```json|```/g,"").trim());}catch{return null;}
@@ -488,7 +488,7 @@ export default function FitLog(){
 
   function saveCustomFood(food){
     const key=food.name.toLowerCase();
-    const updated={...customFoods,[key]:{...food,servingSize:food.quantity||"1 serving"}};
+    const updated={...customFoods,[key]:{...food,servingSize:food.quantity||"1 serving",servingUnit:food.servingUnit||null,servingAmount:food.servingAmount||1}};
     setCustomFoods(updated);save(STORAGE_KEYS.customFoods,updated);
     setMessages(prev=>[...prev,{role:"assistant",content:`📌 "${food.name}" saved to your Foods library.`,type:"info"}]);
     setSaveFoodPrompt(null);
@@ -507,7 +507,7 @@ export default function FitLog(){
     setLoading(false);
   }
 
-  function handleLabelConfirm(scaled){setLabelModal(null);logFoodItem({...scaled,quantity:`${scaled.quantity}`},"snack",true);}
+  function handleLabelConfirm(scaled){setLabelModal(null);logFoodItem({...scaled,quantity:`${scaled.quantity}`,servingUnit:labelModal?.servingUnit||null,servingAmount:labelModal?.servingAmount||1},"snack",true);}
 
   const doLogBW=val=>{const n=parseFloat(val);if(isNaN(n)||n<50||n>500)return null;const entry={date:today(),weight:n,unit:"lbs",timestamp:Date.now()};const updated=[...bodyweight.filter(b=>b.date!==today()),entry].sort((a,b)=>a.date.localeCompare(b.date));setBW(updated);save(STORAGE_KEYS.bodyweight,updated);return n;};
   const saveGoals=()=>{const c=Math.max(0,parseInt(draftCals)||0),p=Math.max(0,parseInt(draftPro)||0),d=calcMacros(c,p,draftSplit),g={calories:c,protein_g:p,carbs_g:d.carbs_g,fat_g:d.fat_g,carbFatSplit:draftSplit};setGoals(g);save(STORAGE_KEYS.goals,g);setSavedFlash(true);setTimeout(()=>setSavedFlash(false),1800);};
@@ -546,7 +546,7 @@ export default function FitLog(){
       }else if(parsed.type==="use_custom_food"){
         const key=(parsed.name||"").toLowerCase();
         const match=Object.keys(customFoods).find(k=>key.includes(k)||k.includes(key));
-        if(match){const food=customFoods[match];const mult=parsed.servings||1;const item={name:food.name,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:`${mult} serving${mult!==1?"s":""}`};logFoodItem(item,parsed.meal||"snack",false);reply=`logged ${item.name}`;}
+        if(match){const food=customFoods[match];let mult=parsed.servings||1;if(parsed.amount&&parsed.unit&&food.servingUnit&&parsed.unit.toLowerCase().includes(food.servingUnit.toLowerCase())){mult=parsed.amount/food.servingAmount;}const item={name:food.name,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:parsed.amount&&parsed.unit?`${parsed.amount} ${parsed.unit}`:`${mult} serving${mult!==1?"s":""}`};logFoodItem(item,parsed.meal||"snack",false);reply=`logged ${item.name}`;}
         else{reply=`I don't have "${parsed.name}" in your Foods library yet.`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);}
 
       }else if(parsed.type==="bodyweight"){
