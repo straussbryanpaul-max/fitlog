@@ -107,7 +107,7 @@ function DeleteBtn({ onDelete, style = {} }) {
 
 // ── Label confirm modal ───────────────────────────────────────────────────────
 function LabelConfirmModal({scanned,onConfirm,onCancel}){
-  const[servings,setServings]=useState("1");
+  const[servings,setServings]=useState("1");   const[rawInput,setRawInput]=useState("1");
   const mult=parseFloat(servings)||1;
   const scaled={name:scanned.name,calories:Math.round(scanned.calories*mult),protein_g:Math.round(scanned.protein_g*mult),carbs_g:Math.round(scanned.carbs_g*mult),fat_g:Math.round(scanned.fat_g*mult),quantity:scanned.servingUnit?`${Math.round(mult*scanned.servingAmount)} ${scanned.servingUnit}`:`${servings} serving${mult!==1?"s":""}`,servingUnit:scanned.servingUnit||null,servingAmount:scanned.servingAmount||1};
   return(
@@ -125,7 +125,7 @@ function LabelConfirmModal({scanned,onConfirm,onCancel}){
         </div>
         <div style={{marginBottom:16}}>
           <label style={{fontSize:13,color:C.muted,display:"block",marginBottom:8,fontWeight:500}}>{scanned.servingUnit?`How many ${scanned.servingUnit}? (1 serving = ${scanned.servingAmount} ${scanned.servingUnit})`:"How many servings?"}</label>
-          <input style={{...inp,textAlign:"center",fontSize:18,fontWeight:700}} type="number" step={scanned.servingUnit?scanned.servingAmount:0.5} min={scanned.servingUnit?scanned.servingAmount:0.5} value={scanned.servingUnit?Math.round(mult*scanned.servingAmount):servings} onChange={e=>scanned.servingUnit?setServings(String(parseFloat(e.target.value)/scanned.servingAmount)):setServings(e.target.value)}/>
+          <input style={{...inp,textAlign:"center",fontSize:18,fontWeight:700}} type="number" step={scanned.servingUnit?scanned.servingAmount:0.5} min={scanned.servingUnit?scanned.servingAmount:0.5} value={rawInput} onChange={e=>{setRawInput(e.target.value);const n=parseFloat(e.target.value);if(!isNaN(n)&&n>0){scanned.servingUnit?setServings(String(n/scanned.servingAmount)):setServings(e.target.value);}}}/>
         </div>
         {mult!==1&&(
           <div style={{background:C.accentLight,borderRadius:12,padding:12,marginBottom:16}}>
@@ -257,7 +257,7 @@ function FoodsTab({customFoods,onDelete,onLog}){
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
             <div style={{fontSize:16,fontWeight:600,color:C.text,textTransform:"capitalize",flex:1}}>{food.name}</div>
             <div style={{display:"flex",gap:8}}>
-              <button style={{background:C.accent,border:"none",borderRadius:8,padding:"6px 14px",color:"#fff",fontSize:13,fontWeight:700,fontFamily:"inherit",cursor:"pointer"}} onClick={()=>onLog(food)}>Log</button>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>               <input                 type="number"                 placeholder={food.servingUnit?`# ${food.servingUnit}`:"servings"}                 style={{...inp,width:90,padding:"6px 8px",fontSize:13,textAlign:"center"}}                 id={`log-amt-${food.name}`}               />               <button style={{background:C.accent,border:"none",borderRadius:8,padding:"6px 14px",color:"#fff",fontSize:13,fontWeight:700,fontFamily:"inherit",cursor:"pointer"}} onClick={()=>{const el=document.getElementById(`log-amt-${food.name}`);const val=parseFloat(el?.value)||1;const mult=food.servingUnit&&food.servingAmount?val/food.servingAmount:val;onLog(food,mult);}}>Log</button>             </div>
               <button style={{background:C.redLight,border:`1px solid ${C.red}`,borderRadius:8,padding:"6px 10px",color:C.red,fontSize:13,fontFamily:"inherit",cursor:"pointer"}} onClick={()=>onDelete(food.name)}>✕</button>
             </div>
           </div>
@@ -695,8 +695,8 @@ export default function FitLog(){
         <FoodsTab
           customFoods={customFoods}
           onDelete={name=>{const u={...customFoods};delete u[name.toLowerCase()];setCustomFoods(u);save(STORAGE_KEYS.customFoods,u);}}
-          onLog={food=>{
-            const entry={date:selectedDate,timestamp:Date.now(),meal:"snack",items:[{...food,quantity:"1 serving"}]};
+          onLog={(food,mult=1)=>{
+            const entry={date:selectedDate,timestamp:Date.now(),meal:"snack",items:[{...food,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:food.servingUnit?`${Math.round(mult*(food.servingAmount||1))} ${food.servingUnit}`:`${mult} serving${mult!==1?"s":""}`}]};
             const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
             setTab("chat");
             setMessages(prev=>[...prev,{role:"assistant",content:`✅ ${food.name} logged!\n${food.calories} cal | ${food.protein_g}g protein | ${food.carbs_g}g carbs | ${food.fat_g}g fat`,type:"nutrition"}]);
