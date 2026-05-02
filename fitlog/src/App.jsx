@@ -19,7 +19,22 @@ const shortDate = iso => { const dt=new Date(iso+"T12:00:00"); return `${["Jan",
 function calcMacros(calories,protein_g,carbPct){const rem=Math.max(0,calories-protein_g*4);return{carbs_g:Math.round(rem*(carbPct/100)/4),fat_g:Math.round(rem*((100-carbPct)/100)/9)};}
 function load(key,fb){try{return JSON.parse(localStorage.getItem(key))??fb;}catch{return fb;}}
 function save(key,data){localStorage.setItem(key,JSON.stringify(data));}
+const MUSCLE_MAP = {
+  "bench press":"chest","incline bench press":"chest","decline bench press":"chest","chest press":"chest","push up":"chest","dip":"chest","cable fly":"chest","pec deck":"chest","fly":"chest",
+  "overhead press":"shoulders","shoulder press":"shoulders","lateral raise":"shoulders","front raise":"shoulders","face pull":"shoulders","upright row":"shoulders","arnold press":"shoulders",
+  "pull-up":"back","chin-up":"back","barbell row":"back","lat pulldown":"back","seated row":"back","cable row":"back","t-bar row":"back","deadlift":"back","romanian deadlift":"back","rack pull":"back",
+  "squat":"legs","leg press":"legs","lunge":"legs","leg extension":"legs","leg curl":"legs","romanian deadlift":"legs","hack squat":"legs","bulgarian split squat":"legs","calf raise":"legs","hip thrust":"legs",
+  "bicep curl":"biceps","hammer curl":"biceps","preacher curl":"biceps","concentration curl":"biceps",
+  "tricep extension":"triceps","skullcrusher":"triceps","tricep pushdown":"triceps","close grip bench":"triceps","overhead tricep extension":"triceps",
+  "plank":"core","crunch":"core","sit up":"core","ab rollout":"core","cable crunch":"core","leg raise":"core",
+};
 
+function getMuscleGroup(exercise){
+  const lower=exercise.toLowerCase().trim();
+  if(MUSCLE_MAP[lower])return MUSCLE_MAP[lower];
+  for(const[k,v]of Object.entries(MUSCLE_MAP)){if(lower.includes(k))return v;}
+  return"other";
+}
 const HARD_ALIASES = {
   "bench":"bench press","barbell bench":"bench press","flat bench":"bench press","bb bench":"bench press","chest press":"bench press",
   "incline":"incline bench press","incline bench":"incline bench press","incline press":"incline bench press",
