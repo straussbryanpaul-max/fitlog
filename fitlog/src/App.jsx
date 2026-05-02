@@ -124,8 +124,8 @@ function LabelConfirmModal({scanned,onConfirm,onCancel}){
           ))}
         </div>
         <div style={{marginBottom:16}}>
-          <label style={{fontSize:13,color:C.muted,display:"block",marginBottom:8,fontWeight:500}}>{scanned.servingUnit?`How many ${scanned.servingUnit}?`:"How many servings?"}</label>
-          <input style={{...inp,textAlign:"center",fontSize:18,fontWeight:700}} type="number" step="0.5" min="0.5" value={servings} onChange={e=>setServings(e.target.value)}/>
+          <label style={{fontSize:13,color:C.muted,display:"block",marginBottom:8,fontWeight:500}}>{scanned.servingUnit?`How many ${scanned.servingUnit}? (1 serving = ${scanned.servingAmount} ${scanned.servingUnit})`:"How many servings?"}</label>
+          <input style={{...inp,textAlign:"center",fontSize:18,fontWeight:700}} type="number" step={scanned.servingUnit?scanned.servingAmount:0.5} min={scanned.servingUnit?scanned.servingAmount:0.5} value={scanned.servingUnit?Math.round(mult*scanned.servingAmount):servings} onChange={e=>scanned.servingUnit?setServings(String(parseFloat(e.target.value)/scanned.servingAmount)):setServings(e.target.value)}/>
         </div>
         {mult!==1&&(
           <div style={{background:C.accentLight,borderRadius:12,padding:12,marginBottom:16}}>
