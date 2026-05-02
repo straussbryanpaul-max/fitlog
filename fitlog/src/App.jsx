@@ -109,7 +109,7 @@ function DeleteBtn({ onDelete, style = {} }) {
 function LabelConfirmModal({scanned,onConfirm,onCancel}){
   const[servings,setServings]=useState("1");
   const mult=parseFloat(servings)||1;
-  const scaled={name:scanned.name,calories:Math.round(scanned.calories*mult),protein_g:Math.round(scanned.protein_g*mult),carbs_g:Math.round(scanned.carbs_g*mult),fat_g:Math.round(scanned.fat_g*mult),quantity:`${servings} serving${mult!==1?"s":""}`};
+  const scaled={name:scanned.name,calories:Math.round(scanned.calories*mult),protein_g:Math.round(scanned.protein_g*mult),carbs_g:Math.round(scanned.carbs_g*mult),fat_g:Math.round(scanned.fat_g*mult),quantity:scanned.servingUnit?`${Math.round(mult*scanned.servingAmount)} ${scanned.servingUnit}`:`${servings} serving${mult!==1?"s":""}`,servingUnit:scanned.servingUnit||null,servingAmount:scanned.servingAmount||1};
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,padding:24,width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
@@ -124,7 +124,7 @@ function LabelConfirmModal({scanned,onConfirm,onCancel}){
           ))}
         </div>
         <div style={{marginBottom:16}}>
-          <label style={{fontSize:13,color:C.muted,display:"block",marginBottom:8,fontWeight:500}}>How many servings?</label>
+          <label style={{fontSize:13,color:C.muted,display:"block",marginBottom:8,fontWeight:500}}>{scanned.servingUnit?`How many ${scanned.servingUnit}?`:"How many servings?"}</label>
           <input style={{...inp,textAlign:"center",fontSize:18,fontWeight:700}} type="number" step="0.5" min="0.5" value={servings} onChange={e=>setServings(e.target.value)}/>
         </div>
         {mult!==1&&(
