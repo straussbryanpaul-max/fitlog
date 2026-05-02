@@ -279,7 +279,7 @@ function FoodsTab({customFoods,onDelete,onLog}){
 function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet,weeklySets}){
   const[search,setSearch]=useState("");
   const[selected,setSelected]=useState(null);
-  const currentWeekKey=new Date().toISOString().slice(0,7);const currentWeekSets=weeklySets[currentWeekKey]||{};const muscleOrder=["chest","back","shoulders","legs","biceps","triceps","core","other"];const weekEntries=muscleOrder.filter(m=>currentWeekSets[m]>0).map(m=>([m,currentWeekSets[m]]));const maxSets=weekEntries.length?Math.max(...weekEntries.map(([,v])=>v)):0;
+  const currentWeekKey=new Date().toISOString().slice(0,7);const currentWeekSets={};workouts.filter(w=>w.date.slice(0,7)===currentWeekKey).forEach(w=>w.sets.forEach(s=>{const mg=getMuscleGroup(resolveEx(s.exercise));currentWeekSets[mg]=(currentWeekSets[mg]||0)+s.sets;}));const muscleOrder=["chest","back","shoulders","legs","biceps","triceps","core","other"];const weekEntries=muscleOrder.filter(m=>currentWeekSets[m]>0).map(m=>([m,currentWeekSets[m]]));const maxSets=weekEntries.length?Math.max(...weekEntries.map(([,v])=>v)):0;
   function resolveEx(raw){const l=raw.toLowerCase().trim();return exerciseMap[l]||HARD_ALIASES[l]||l;}
   const library={};
   workouts.forEach(w=>{w.sets.forEach(s=>{const c=resolveEx(s.exercise);if(!library[c])library[c]={sessions:[],aliases:new Set()};library[c].aliases.add(s.exercise.toLowerCase().trim());const ex=library[c].sessions.find(x=>x.date===w.date);if(ex){if(s.weight>ex.weight){ex.weight=s.weight;ex.reps=s.reps;ex.sets=s.sets;}}else library[c].sessions.push({date:w.date,weight:s.weight,reps:s.reps,sets:s.sets});});});
