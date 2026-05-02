@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 
 const STORAGE_KEYS = {
   workouts: "fitlog_workouts",
+  weeklysets: "fitlog_weeklysets",
   nutrition: "fitlog_nutrition",
   bodyweight: "fitlog_bodyweight",
   goals: "fitlog_goals",
@@ -275,9 +276,10 @@ function FoodsTab({customFoods,onDelete,onLog}){
 }
 
 // ── Lifts tab ─────────────────────────────────────────────────────────────────
-function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet}){
+function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet,weeklySets}){
   const[search,setSearch]=useState("");
   const[selected,setSelected]=useState(null);
+  const currentWeekKey=new Date().toISOString().slice(0,7);const currentWeekSets=weeklySets[currentWeekKey]||{};const muscleOrder=["chest","back","shoulders","legs","biceps","triceps","core","other"];const weekEntries=muscleOrder.filter(m=>currentWeekSets[m]>0).map(m=>([m,currentWeekSets[m]]));const maxSets=weekEntries.length?Math.max(...weekEntries.map(([,v])=>v)):0;
   function resolveEx(raw){const l=raw.toLowerCase().trim();return exerciseMap[l]||HARD_ALIASES[l]||l;}
   const library={};
   workouts.forEach(w=>{w.sets.forEach(s=>{const c=resolveEx(s.exercise);if(!library[c])library[c]={sessions:[],aliases:new Set()};library[c].aliases.add(s.exercise.toLowerCase().trim());const ex=library[c].sessions.find(x=>x.date===w.date);if(ex){if(s.weight>ex.weight){ex.weight=s.weight;ex.reps=s.reps;ex.sets=s.sets;}}else library[c].sessions.push({date:w.date,weight:s.weight,reps:s.reps,sets:s.sets});});});
@@ -291,6 +293,7 @@ function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet}){
   const trend=sel&&sel.sessions.length>=2?latest.weight-sel.sessions[0].weight:null;
   return(
     <div style={{flex:1,overflowY:"auto",padding:16}}>
+      {weekEntries.length>0&&<div style={{...card,marginBottom:16}}><div style={ctitle}>Weekly Sets</div>{weekEntries.map(([muscle,sets])=>(<div key={muscle} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:14,fontWeight:600,color:C.text,textTransform:"capitalize"}}>{muscle}</span><span style={{fontSize:14,fontWeight:700,color:C.accent}}>{sets} sets</span></div><div style={{height:8,borderRadius:4,background:C.bg,border:`1px solid ${C.border}`,overflow:"hidden"}}><div style={{height:"100%",width:`${(sets/maxSets)*100}%`,background:C.accent,borderRadius:4,transition:"width 0.4s ease"}}/></div></div>))}</div>}
       <div style={{position:"relative",marginBottom:16}}>
         <input style={{...inp,paddingLeft:42}} placeholder="Search exercises..." value={search} onChange={e=>{setSearch(e.target.value);setSelected(null);}}/>
         <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",color:C.mutedLight,fontSize:16}}>🔍</span>
@@ -412,7 +415,7 @@ export default function FitLog(){
   const[messages,setMessages]=useState([
     {role:"assistant",content:"Hey! Log workouts, food, or bodyweight — or ask me anything.\n\n• \"Bench 3x8 at 185\"\n• \"Lunch: chicken breast, rice\"\n• \"Protein bar, 190cal, 21g protein, 18g carbs, 6g fat\"\n• \"175 lbs\" to log bodyweight\n• 📷 Scan a nutrition label\n• \"Is my bench improving?\"",type:"intro"}
   ]);
-  const[workouts,setWorkouts]=useState([]);
+  const[workouts,setWorkouts]=useState([]);   const[weeklySets,setWeeklySets]=useState({});
   const[nutrition,setNutrition]=useState([]);
   const[bodyweight,setBW]=useState([]);
   const[goals,setGoals]=useState(DEFAULT_GOALS);
@@ -434,7 +437,7 @@ export default function FitLog(){
   const fileRef=useRef(null);
 
   useEffect(()=>{
-    setWorkouts(load(STORAGE_KEYS.workouts,[]));
+    setWorkouts(load(STORAGE_KEYS.workouts,[]));     setWeeklySets(load(STORAGE_KEYS.weeklysets,{}));
     setNutrition(load(STORAGE_KEYS.nutrition,[]));
     setBW(load(STORAGE_KEYS.bodyweight,[]));
     setTemplates(load(STORAGE_KEYS.templates,{}));
@@ -457,6 +460,7 @@ export default function FitLog(){
   function commitWorkout(sets){
     const entry={date:selectedDate,timestamp:Date.now(),sets};
     const u=[...workouts,entry];setWorkouts(u);save(STORAGE_KEYS.workouts,u);
+    const weekKey=selectedDate.slice(0,7);const updated={...weeklySets};if(!updated[weekKey])updated[weekKey]={};sets.forEach(s=>{const mg=getMuscleGroup(s.exercise);updated[weekKey][mg]=(updated[weekKey][mg]||0)+s.sets;});setWeeklySets(updated);save(STORAGE_KEYS.weeklysets,updated);
     const reply=`✅ Workout logged!\n${sets.map(s=>`  • ${s.exercise}: ${s.sets}×${s.reps} @ ${s.weight}${s.unit}`).join("\n")}`;
     setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"workout"}]);
   }
@@ -684,7 +688,7 @@ export default function FitLog(){
         </div>
       )}
 
-      {tab==="lifts"&&<LiftsTab workouts={workouts} exerciseMap={exerciseMap} onDeleteWorkout={deleteWorkoutEntry} onDeleteSet={deleteWorkoutSet}/>}
+      {tab==="lifts"&&<LiftsTab workouts={workouts} exerciseMap={exerciseMap} onDeleteWorkout={deleteWorkoutEntry} onDeleteSet={deleteWorkoutSet} weeklySets={weeklySets}/>}
 
       {tab==="foods"&&(
         <FoodsTab
