@@ -335,7 +335,7 @@ function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet,weeklySets})
             {[...sel.sessions].reverse().map((s,i)=>(
               <div key={i} style={{...rowSt}}>
                 <span style={{color:C.muted,fontSize:14}}>{shortDate(s.date)}</span>
-                <span style={{flex:1,marginLeft:10,fontSize:14}}>{s.sets}×{s.reps} @ <span style={{color:s.weight===best?C.amber:C.accent,fontWeight:700}}>{s.weight} lbs</span>{s.weight===best&&<span style={{fontSize:11,color:C.amber,marginLeft:4}}>★ PR</span>}</span>
+                <span style={{flex:1,marginLeft:10,fontSize:14}}>best: <span style={{color:s.weight===best?C.amber:C.accent,fontWeight:700}}>{s.weight} lbs × {s.reps}</span>{s.weight===best&&<span style={{fontSize:11,color:C.amber,marginLeft:4}}>★ PR</span>}</span>
                 <DeleteBtn onDelete={()=>{onDeleteSet(s.date,selected);if(sel.sessions.length<=1)setSelected(null);}} style={{marginLeft:8}}/>
               </div>
             ))}
