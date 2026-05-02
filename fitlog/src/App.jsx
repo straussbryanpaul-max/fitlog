@@ -28,6 +28,7 @@ const MUSCLE_MAP = {
   "bicep curl":"biceps","hammer curl":"biceps","preacher curl":"biceps","concentration curl":"biceps",
   "tricep extension":"triceps","skullcrusher":"triceps","tricep pushdown":"triceps","close grip bench":"triceps","overhead tricep extension":"triceps",
   "plank":"core","crunch":"core","sit up":"core","ab rollout":"core","cable crunch":"core","leg raise":"core",
+  "run":"cardio","running":"cardio","treadmill":"cardio","bike":"cardio","cycling":"cardio","elliptical":"cardio","rowing":"cardio","stairmaster":"cardio","jump rope":"cardio","hiit":"cardio","cardio":"cardio",
 };
 
 function getMuscleGroup(exercise){
@@ -279,7 +280,7 @@ function FoodsTab({customFoods,onDelete,onLog}){
 function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet,weeklySets}){
   const[search,setSearch]=useState("");
   const[selected,setSelected]=useState(null);
-  const currentWeekKey=new Date().toISOString().slice(0,7);const currentWeekSets={};workouts.filter(w=>w.date.slice(0,7)===currentWeekKey).forEach(w=>w.sets.forEach(s=>{const mg=getMuscleGroup(resolveEx(s.exercise));currentWeekSets[mg]=(currentWeekSets[mg]||0)+s.sets;}));const muscleOrder=["chest","back","shoulders","legs","biceps","triceps","core","other"];const weekEntries=muscleOrder.filter(m=>currentWeekSets[m]>0).map(m=>([m,currentWeekSets[m]]));const maxSets=weekEntries.length?Math.max(...weekEntries.map(([,v])=>v)):0;
+  const currentWeekKey=new Date().toISOString().slice(0,7);const currentWeekSets={};workouts.filter(w=>w.date.slice(0,7)===currentWeekKey).forEach(w=>{const cardioSets=w.sets.filter(s=>getMuscleGroup(resolveEx(s.exercise))==="cardio");const nonCardioSets=w.sets.filter(s=>getMuscleGroup(resolveEx(s.exercise))!=="cardio");if(cardioSets.length>0)currentWeekSets["cardio"]=(currentWeekSets["cardio"]||0)+1;nonCardioSets.forEach(s=>{const mg=getMuscleGroup(resolveEx(s.exercise));currentWeekSets[mg]=(currentWeekSets[mg]||0)+s.sets;});});const muscleOrder=["chest","back","shoulders","legs","biceps","triceps","core","cardio","other"];const weekEntries=muscleOrder.filter(m=>currentWeekSets[m]>0).map(m=>([m,currentWeekSets[m]]));const maxSets=weekEntries.length?Math.max(...weekEntries.map(([,v])=>v)):0;
   function resolveEx(raw){const l=raw.toLowerCase().trim();return exerciseMap[l]||HARD_ALIASES[l]||l;}
   const library={};
   workouts.forEach(w=>{w.sets.forEach(s=>{const c=resolveEx(s.exercise);if(!library[c])library[c]={sessions:[],aliases:new Set()};library[c].aliases.add(s.exercise.toLowerCase().trim());const ex=library[c].sessions.find(x=>x.date===w.date);if(ex){if(s.weight>ex.weight){ex.weight=s.weight;ex.reps=s.reps;ex.sets=s.sets;}}else library[c].sessions.push({date:w.date,weight:s.weight,reps:s.reps,sets:s.sets});});});
@@ -293,7 +294,7 @@ function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet,weeklySets})
   const trend=sel&&sel.sessions.length>=2?latest.weight-sel.sessions[0].weight:null;
   return(
     <div style={{flex:1,overflowY:"auto",padding:16}}>
-      {weekEntries.length>0&&<div style={{...card,marginBottom:16}}><div style={ctitle}>Weekly Sets</div>{weekEntries.map(([muscle,sets])=>(<div key={muscle} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:14,fontWeight:600,color:C.text,textTransform:"capitalize"}}>{muscle}</span><span style={{fontSize:14,fontWeight:700,color:C.accent}}>{sets} sets</span></div><div style={{height:8,borderRadius:4,background:C.bg,border:`1px solid ${C.border}`,overflow:"hidden"}}><div style={{height:"100%",width:`${(sets/maxSets)*100}%`,background:C.accent,borderRadius:4,transition:"width 0.4s ease"}}/></div></div>))}</div>}
+      {weekEntries.length>0&&<div style={{...card,marginBottom:16}}><div style={ctitle}>Weekly Sets</div>{weekEntries.map(([muscle,sets])=>(<div key={muscle} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:14,fontWeight:600,color:C.text,textTransform:"capitalize"}}>{muscle}</span><span style={{fontSize:14,fontWeight:700,color:C.accent}}>{muscle==="cardio"?`${sets} session${sets!==1?"s":""}`:`${sets} sets`}</span></div><div style={{height:8,borderRadius:4,background:C.bg,border:`1px solid ${C.border}`,overflow:"hidden"}}><div style={{height:"100%",width:`${(sets/maxSets)*100}%`,background:C.accent,borderRadius:4,transition:"width 0.4s ease"}}/></div></div>))}</div>}
       <div style={{position:"relative",marginBottom:16}}>
         <input style={{...inp,paddingLeft:42}} placeholder="Search exercises..." value={search} onChange={e=>{setSearch(e.target.value);setSelected(null);}}/>
         <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",color:C.mutedLight,fontSize:16}}>🔍</span>
