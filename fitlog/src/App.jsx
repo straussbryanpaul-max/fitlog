@@ -545,10 +545,7 @@ export default function FitLog(){
         logFoodItem(item,parsed.meal||"snack",true);reply=`logged ${item.name}`;
 
       }else if(parsed.type==="nutrition"){
-        setPendingLog({items:parsed.items,meal:parsed.meal});const preview=parsed.items.map(i=>`• ${i.quantity} ${i.name}: ${i.calories} cal | ${i.protein_g}g protein | ${i.carbs_g}g carbs | ${i.fat_g}g fat`).join("
-");reply=`${preview}
-
-Log this?`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
+       setPendingLog({items:parsed.items,meal:parsed.meal});const preview=parsed.items.map(i=>`\u2022 ${i.quantity} ${i.name}: ${i.calories} cal | ${i.protein_g}g protein | ${i.carbs_g}g carbs | ${i.fat_g}g fat`).join("\n");reply=`${preview}\n\nLog this?`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
 
       }else if(parsed.type==="use_custom_food"){
         const key=(parsed.name||"").toLowerCase();
