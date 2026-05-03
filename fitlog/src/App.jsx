@@ -407,6 +407,7 @@ Bodyweight: {"type":"bodyweight","weight":number,"unit":"lbs"}
 Save template: {"type":"save_template","name":"string","meal":"breakfast"|"lunch"|"dinner"|"snack","items":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}
 Use template: {"type":"use_template","name":"string","servings":number}
 Use custom food: {"type":"use_custom_food","name":"string","servings":number,"meal":"breakfast"|"lunch"|"dinner"|"snack"}
+Create custom food from ingredients: {"type":"create_custom_food","name":"string","ingredients":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}
 Trend/analysis question: {"type":"query"}
 Unclear: {"type":"unclear","response":"string"}
 
@@ -551,7 +552,14 @@ export default function FitLog(){
         const match=Object.keys(customFoods).find(k=>key.includes(k)||k.includes(key));
         if(match){const food=customFoods[match];let mult=parsed.servings||1;if(parsed.amount&&parsed.unit&&food.servingUnit&&parsed.unit.toLowerCase().includes(food.servingUnit.toLowerCase())){mult=parsed.amount/food.servingAmount;}const item={name:food.name,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:parsed.amount&&parsed.unit?`${parsed.amount} ${parsed.unit}`:`${mult} serving${mult!==1?"s":""}`};logFoodItem(item,parsed.meal||"snack",false);reply=`logged ${item.name}`;}
         else{reply=`I don't have "${parsed.name}" in your Foods library yet.`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);}
-
+      }else if(parsed.type==="create_custom_food"){
+        const totals=parsed.ingredients.reduce((a,i)=>({calories:a.calories+(i.calories||0),protein_g:a.protein_g+(i.protein_g||0),carbs_g:a.carbs_g+(i.carbs_g||0),fat_g:a.fat_g+(i.fat_g||0)}),{calories:0,protein_g:0,carbs_g:0,fat_g:0});
+        const food={name:parsed.name,calories:Math.round(totals.calories),protein_g:Math.round(totals.protein_g),carbs_g:Math.round(totals.carbs_g),fat_g:Math.round(totals.fat_g),servingSize:"1 serving",servingUnit:null,servingAmount:1};
+        const key=parsed.name.toLowerCase();
+        const updated={...customFoods,[key]:food};
+        setCustomFoods(updated);save(STORAGE_KEYS.customFoods,updated);
+        reply=`📌 "${parsed.name}" saved!\n${parsed.ingredients.map(i=>`  • ${i.quantity} ${i.name}`).join("\n")}\n\nTotal: ${food.calories} cal | ${food.protein_g}g protein | ${food.carbs_g}g carbs | ${food.fat_g}g fat`;
+        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
       }else if(parsed.type==="bodyweight"){
         const val=doLogBW(String(parsed.weight));
         reply=val?`⚖️ Bodyweight logged: ${val} lbs`:"That weight didn't look right.";
