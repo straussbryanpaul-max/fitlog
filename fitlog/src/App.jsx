@@ -411,7 +411,7 @@ Create custom food from ingredients: {"type":"create_custom_food","name":"string
 Trend/analysis question: {"type":"query"}
 Unclear: {"type":"unclear","response":"string"}
 
-IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type. For branded or packaged foods, always look up accurate macros rather than estimating. For generic whole foods (chicken breast, rice, banana etc) estimating is fine.`;
+IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type. For ANY branded, packaged, or processed food — always use web search to find accurate macros before responding. Only estimate for simple whole foods like plain chicken breast, plain rice, fresh fruit, vegetables. When in doubt, search.`;
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function FitLog(){
