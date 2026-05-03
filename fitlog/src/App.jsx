@@ -522,6 +522,8 @@ export default function FitLog(){
     setMessages(prev=>[...prev,{role:"user",content:userMsg}]);
     setLoading(true);
     try{
+      if(pendingLog&&/^(yes|y|yep|yup|correct|log it|looks good|log|right|ok|sure)$/i.test(userMsg.trim())){pendingLog.items.forEach((item,idx)=>logFoodItem(item,pendingLog.meal,idx===0));setPendingLog(null);setLoading(false);return;}
+      if(pendingLog&&/^(no|nope|wrong|incorrect|cancel)$/i.test(userMsg.trim())){setPendingLog(null);setMessages(prev=>[...prev,{role:"assistant",content:"No problem, what should I correct?",type:"info"}]);setLoading(false);return;}
       const text=await callClaudeText(userMsg,context,PARSE_SYSTEM);
       let parsed;
       try{parsed=JSON.parse(text.replace(/```json|```/g,"").trim());}
@@ -590,14 +592,7 @@ export default function FitLog(){
         }
 
      
-        }else if(pendingLog&&/^(yes|y|yep|yup|correct|log it|looks good|log|right|ok|sure)$/i.test(userMsg.trim())){
-        pendingLog.items.forEach((item,idx)=>logFoodItem(item,pendingLog.meal,idx===0));
-        setPendingLog(null);
-        reply=``;
-      }else if(pendingLog&&/^(no|nope|wrong|incorrect|cancel)$/i.test(userMsg.trim())){
-        setPendingLog(null);
-        reply=`No problem, what should I correct?`;
-        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
+        
       }else{
         const ans=await callClaudeText(userMsg,context,`You are FitLog, a friendly fitness assistant. You help users log workouts, food, and bodyweight. You can also answer general fitness, nutrition, and health questions conversationally. Keep responses concise and helpful.\n\n${buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap)}`, true);
         reply=ans||"Sorry, something went wrong.";
