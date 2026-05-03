@@ -28,7 +28,7 @@ const MUSCLE_MAP = {
   "bicep curl":"biceps","hammer curl":"biceps","preacher curl":"biceps","concentration curl":"biceps",
   "tricep extension":"triceps","skullcrusher":"triceps","tricep pushdown":"triceps","close grip bench":"triceps","overhead tricep extension":"triceps",
   "plank":"core","crunch":"core","sit up":"core","ab rollout":"core","cable crunch":"core","leg raise":"core",
-  "run":"cardio","running":"cardio","treadmill":"cardio","bike":"cardio","cycling":"cardio","elliptical":"cardio","rowing":"cardio","stairmaster":"cardio","jump rope":"cardio","hiit":"cardio","cardio":"cardio",
+  "run":"cardio","running":"cardio","treadmill":"cardio","bike":"cardio","cycling":"cardio","elliptical":"cardio","rowing":"cardio","stairmaster":"cardio","jump rope":"cardio","hiit":"cardio","cardio":"cardio","walk":"cardio","walking":"cardio","power walk":"cardio","power walking":"cardio",
 };
 
 function getMuscleGroup(exercise){
