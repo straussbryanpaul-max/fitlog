@@ -436,7 +436,7 @@ export default function FitLog(){
   const[savedFlash,setSavedFlash]=useState(false);   const[weekOffset,setWeekOffset]=useState(0);
   const[confirmModal,setConfirmModal]=useState(null);
   const[labelModal,setLabelModal]=useState(null);
-  const[saveFoodPrompt,setSaveFoodPrompt]=useState(null);
+  const[saveFoodPrompt,setSaveFoodPrompt]=useState(null);   const[pendingLog,setPendingLog]=useState(null);
   const bottomRef=useRef(null);
   const inputRef=useRef(null);
   const fileRef=useRef(null);
@@ -545,7 +545,10 @@ export default function FitLog(){
         logFoodItem(item,parsed.meal||"snack",true);reply=`logged ${item.name}`;
 
       }else if(parsed.type==="nutrition"){
-        parsed.items.forEach((item,idx)=>logFoodItem(item,parsed.meal,idx===0));reply=``;
+        setPendingLog({items:parsed.items,meal:parsed.meal});const preview=parsed.items.map(i=>`• ${i.quantity} ${i.name}: ${i.calories} cal | ${i.protein_g}g protein | ${i.carbs_g}g carbs | ${i.fat_g}g fat`).join("
+");reply=`${preview}
+
+Log this?`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
 
       }else if(parsed.type==="use_custom_food"){
         const key=(parsed.name||"").toLowerCase();
@@ -589,6 +592,15 @@ export default function FitLog(){
           setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);
         }
 
+     
+        }else if(pendingLog&&/^(yes|y|yep|yup|correct|log it|looks good|log|right|ok|sure)$/i.test(userMsg.trim())){
+        pendingLog.items.forEach((item,idx)=>logFoodItem(item,pendingLog.meal,idx===0));
+        setPendingLog(null);
+        reply=``;
+      }else if(pendingLog&&/^(no|nope|wrong|incorrect|cancel)$/i.test(userMsg.trim())){
+        setPendingLog(null);
+        reply=`No problem, what should I correct?`;
+        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
       }else{
         const ans=await callClaudeText(userMsg,context,`You are FitLog, a friendly fitness assistant. You help users log workouts, food, and bodyweight. You can also answer general fitness, nutrition, and health questions conversationally. Keep responses concise and helpful.\n\n${buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap)}`, true);
         reply=ans||"Sorry, something went wrong.";
