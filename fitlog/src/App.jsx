@@ -21,7 +21,7 @@ function calcMacros(calories,protein_g,carbPct){const rem=Math.max(0,calories-pr
 function load(key,fb){try{return JSON.parse(localStorage.getItem(key))??fb;}catch{return fb;}}
 function save(key,data){localStorage.setItem(key,JSON.stringify(data));}
 const MUSCLE_MAP = {
-  "bench press":"chest","incline bench press":"chest","decline bench press":"chest","chest press":"chest","push up":"chest","dip":"chest","cable fly":"chest","pec deck":"chest","fly":"chest","chest":"chest",
+  "bench press":"chest","incline bench press":"chest","decline bench press":"chest","chest press":"chest","push up":"chest","dip":"chest","cable fly":"chest","pec deck":"chest","fly":"chest","chest":"chest","bench":"chest",
   "overhead press":"shoulders","shoulder press":"shoulders","lateral raise":"shoulders","front raise":"shoulders","face pull":"shoulders","upright row":"shoulders","arnold press":"shoulders","shoulder":"shoulders",
   "pull-up":"back","chin-up":"back","barbell row":"back","lat pulldown":"back","seated row":"back","cable row":"back","t-bar row":"back","deadlift":"back","romanian deadlift":"back","rack pull":"back","back extension":"back","hyperextension":"back","back":"back",
   "squat":"legs","leg press":"legs","lunge":"legs","leg extension":"legs","leg curl":"legs","hack squat":"legs","bulgarian split squat":"legs","calf raise":"legs","hip thrust":"legs","glute bridge":"legs","quad":"legs","quads":"legs","hamstring":"legs","hamstrings":"legs","glute":"legs","glutes":"legs","calf":"legs","calves":"legs",
