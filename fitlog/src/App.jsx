@@ -21,21 +21,22 @@ function calcMacros(calories,protein_g,carbPct){const rem=Math.max(0,calories-pr
 function load(key,fb){try{return JSON.parse(localStorage.getItem(key))??fb;}catch{return fb;}}
 function save(key,data){localStorage.setItem(key,JSON.stringify(data));}
 const MUSCLE_MAP = {
-  "bench press":"chest","incline bench press":"chest","decline bench press":"chest","chest press":"chest","push up":"chest","dip":"chest","cable fly":"chest","pec deck":"chest","fly":"chest",
-  "overhead press":"shoulders","shoulder press":"shoulders","lateral raise":"shoulders","front raise":"shoulders","face pull":"shoulders","upright row":"shoulders","arnold press":"shoulders",
-  "pull-up":"back","chin-up":"back","barbell row":"back","lat pulldown":"back","seated row":"back","cable row":"back","t-bar row":"back","deadlift":"back","romanian deadlift":"back","rack pull":"back",
-  "squat":"legs","leg press":"legs","lunge":"legs","leg extension":"legs","leg curl":"legs","romanian deadlift":"legs","hack squat":"legs","bulgarian split squat":"legs","calf raise":"legs","hip thrust":"legs",
-  "bicep curl":"biceps","hammer curl":"biceps","preacher curl":"biceps","concentration curl":"biceps",
-  "tricep extension":"triceps","skullcrusher":"triceps","tricep pushdown":"triceps","close grip bench":"triceps","overhead tricep extension":"triceps",
-  "plank":"core","crunch":"core","sit up":"core","ab rollout":"core","cable crunch":"core","leg raise":"core",
+  "bench press":"chest","incline bench press":"chest","decline bench press":"chest","chest press":"chest","push up":"chest","dip":"chest","cable fly":"chest","pec deck":"chest","fly":"chest","chest":"chest",
+  "overhead press":"shoulders","shoulder press":"shoulders","lateral raise":"shoulders","front raise":"shoulders","face pull":"shoulders","upright row":"shoulders","arnold press":"shoulders","shoulder":"shoulders",
+  "pull-up":"back","chin-up":"back","barbell row":"back","lat pulldown":"back","seated row":"back","cable row":"back","t-bar row":"back","deadlift":"back","romanian deadlift":"back","rack pull":"back","back extension":"back","hyperextension":"back","back":"back",
+  "squat":"legs","leg press":"legs","lunge":"legs","leg extension":"legs","leg curl":"legs","hack squat":"legs","bulgarian split squat":"legs","calf raise":"legs","hip thrust":"legs","glute bridge":"legs","quad":"legs","quads":"legs","hamstring":"legs","hamstrings":"legs","glute":"legs","glutes":"legs","calf":"legs","calves":"legs",
+  "bicep curl":"biceps","hammer curl":"biceps","preacher curl":"biceps","concentration curl":"biceps","bicep":"biceps","biceps":"biceps",
+  "tricep extension":"triceps","skullcrusher":"triceps","tricep pushdown":"triceps","close grip bench":"triceps","overhead tricep extension":"triceps","rope pushdown":"triceps","cable pushdown":"triceps","tricep":"triceps","triceps":"triceps",
+  "plank":"core","crunch":"core","sit up":"core","ab rollout":"core","cable crunch":"core","leg raise":"core","ab wheel":"core","hanging knee raise":"core","russian twist":"core","abs":"core","ab":"core",
   "run":"cardio","running":"cardio","treadmill":"cardio","bike":"cardio","cycling":"cardio","elliptical":"cardio","rowing":"cardio","stairmaster":"cardio","jump rope":"cardio","hiit":"cardio","cardio":"cardio","walk":"cardio","walking":"cardio","power walk":"cardio","power walking":"cardio",
 };
 
 function getMuscleGroup(exercise){
   const lower=exercise.toLowerCase().trim();
   if(MUSCLE_MAP[lower])return MUSCLE_MAP[lower];
-  for(const[k,v]of Object.entries(MUSCLE_MAP)){if(lower.includes(k))return v;}
-  return"other";
+  let best=null,bestLen=0;
+  for(const[k,v]of Object.entries(MUSCLE_MAP)){if(lower.includes(k)&&k.length>bestLen){bestLen=k.length;best=v;}}
+  return best||"other";
 }
 const HARD_ALIASES = {
   "bench":"bench press","barbell bench":"bench press","flat bench":"bench press","bb bench":"bench press","chest press":"bench press",
@@ -48,8 +49,8 @@ const HARD_ALIASES = {
   "pullup":"pull-up","pull up":"pull-up","chin up":"chin-up","chinup":"chin-up",
   "lat pulldown":"lat pulldown","lat pull-down":"lat pulldown","pulldown":"lat pulldown",
   "curl":"bicep curl","bicep curls":"bicep curl","barbell curl":"bicep curl","curls":"bicep curl",
-  "tricep extension":"tricep extension","skullcrusher":"skullcrusher","skull crusher":"skullcrusher",
-  "lunge":"lunge","lunges":"lunge","dip":"dip","dips":"dip",
+  "tricep extension":"tricep extension","skullcrusher":"skullcrusher","skull crusher":"skullcrusher","tricep rope":"tricep pushdown","overhead extension":"overhead tricep extension","tricep dip":"tricep extension","tricep dips":"tricep extension",
+  "lunge":"lunge","lunges":"lunge","dip":"dip","dips":"dip","glute bridge":"glute bridge","hip hinge":"romanian deadlift",
 };
 
 function tokenize(s){return s.toLowerCase().replace(/[^a-z0-9 ]/g,"").split(/\s+/).filter(Boolean);}
@@ -291,7 +292,7 @@ function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet,weeklySets})
   const weekEntries=muscleOrder.filter(m=>currentWeekSets[m]>0).map(m=>([m,currentWeekSets[m]]));const maxSets=weekEntries.length?Math.max(...weekEntries.map(([,v])=>v)):0;
   const muscleDetail={};workouts.filter(w=>weekDays.includes(w.date)).forEach(w=>w.sets.forEach(s=>{const mg=getMuscleGroup(resolveEx(s.exercise));const ex=resolveEx(s.exercise);if(!muscleDetail[mg])muscleDetail[mg]={};if(!muscleDetail[mg][ex])muscleDetail[mg][ex]={sets:0,dates:[]};muscleDetail[mg][ex].sets+=s.sets;if(!muscleDetail[mg][ex].dates.includes(w.date))muscleDetail[mg][ex].dates.push(w.date);}));
   const library={};
-  workouts.forEach(w=>{w.sets.forEach(s=>{const c=resolveEx(s.exercise);if(!s.weight||s.weight===0)return;if(!library[c])library[c]={sessions:[],aliases:new Set()};library[c].aliases.add(s.exercise.toLowerCase().trim());const ex=library[c].sessions.find(x=>x.date===w.date);if(ex){if(s.weight>ex.weight){ex.weight=s.weight;ex.reps=s.reps;ex.sets=s.sets;}}else library[c].sessions.push({date:w.date,weight:s.weight,reps:s.reps,sets:s.sets});});});
+  workouts.forEach(w=>{w.sets.forEach(s=>{const c=resolveEx(s.exercise);if(!s.weight||s.weight===0)return;if(getMuscleGroup(c)==="cardio")return;if(!library[c])library[c]={sessions:[],aliases:new Set()};library[c].aliases.add(s.exercise.toLowerCase().trim());const ex=library[c].sessions.find(x=>x.date===w.date);if(ex){if(s.weight>ex.weight){ex.weight=s.weight;ex.reps=s.reps;ex.sets=s.sets;}}else library[c].sessions.push({date:w.date,weight:s.weight,reps:s.reps,sets:s.sets});});});
   Object.values(library).forEach(ex=>ex.sessions.sort((a,b)=>a.date.localeCompare(b.date)));
   const names=Object.keys(library).sort();
   const filtered=search.trim()?names.filter(n=>{const q=search.toLowerCase();return n.includes(q)||[...library[n].aliases].some(a=>a.includes(q));}):names;
