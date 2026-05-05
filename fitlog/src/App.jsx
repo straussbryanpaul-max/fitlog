@@ -356,7 +356,7 @@ function LiftsTab({workouts,exerciseMap,muscleOverrides={},onDeleteWorkout,onDel
             {[...sel.sessions].reverse().map((s,i)=>(
               <div key={i} style={{...rowSt}}>
                 <span style={{color:C.muted,fontSize:14}}>{shortDate(s.date)}</span>
-                <span style={{flex:1,marginLeft:10,fontSize:14}}>best: <span style={{color:s.weight===best?C.amber:C.accent,fontWeight:700}}>{s.weight} lbs × {s.reps}</span>{s.weight===best&&<span style={{fontSize:11,color:C.amber,marginLeft:4}}>★ PR</span>}</span>
+                <span style={{flex:1,marginLeft:10,fontSize:14}}>{s.weight?<>best: <span style={{color:s.weight===best?C.amber:C.accent,fontWeight:700}}>{s.weight} lbs × {s.reps}</span>{s.weight===best&&<span style={{fontSize:11,color:C.amber,marginLeft:4}}>★ PR</span>}</>:<span style={{color:C.accent,fontWeight:700}}>{s.sets} sets</span>}</span>
                 <DeleteBtn onDelete={()=>{onDeleteSet(s.date,selected);if(sel.sessions.length<=1)setSelected(null);}} style={{marginLeft:8}}/>
               </div>
             ))}
@@ -419,6 +419,7 @@ const PARSE_SYSTEM=`You are FitLog. Parse input into JSON only. No plain text.
 
 Workout: {"type":"workout","sets":[{"exercise":"string","sets":number,"reps":number,"weight":number,"unit":"lbs","muscleGroup":"chest|back|shoulders|legs|biceps|triceps|core|cardio|null"}]}
 If user types "category - exercise - sets" format (e.g. "chest - incline machine press - 4x10 @ 155"), extract the category as muscleGroup and the exercise name as exercise. Valid muscleGroup values: chest, back, shoulders, legs, biceps, triceps, core, cardio. Set muscleGroup to null if not specified by the user.
+reps and weight are ALWAYS optional — use 0 if not provided. Never return "unclear" just because reps or weight are missing. Examples: "lateral raises 4 sets" → sets=4, reps=0, weight=0. "shoulders - lateral raises - 4 sets" → sets=4, reps=0, weight=0, muscleGroup="shoulders".
 Nutrition with KNOWN macros (user stated cal/protein/carbs/fat): {"type":"nutrition_known","name":"food name","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string","meal":"breakfast"|"lunch"|"dinner"|"snack","servings":number}
 Nutrition lookup (user didn't state macros): {"type":"nutrition","items":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}],"meal":"breakfast"|"lunch"|"dinner"|"snack"}
 Bodyweight: {"type":"bodyweight","weight":number,"unit":"lbs"}
@@ -486,7 +487,8 @@ export default function FitLog(){
     const entry={date:selectedDate,timestamp:Date.now(),sets};
     const u=[...workouts,entry];setWorkouts(u);save(STORAGE_KEYS.workouts,u);
     const weekKey=selectedDate.slice(0,7);const updated={...weeklySets};if(!updated[weekKey])updated[weekKey]={};sets.forEach(s=>{const mg=getMuscleGroup(s.exercise,overrides);updated[weekKey][mg]=(updated[weekKey][mg]||0)+s.sets;});setWeeklySets(updated);save(STORAGE_KEYS.weeklysets,updated);
-    const reply=`✅ Workout logged!\n${sets.map(s=>`  • ${s.exercise}: ${s.sets}×${s.reps} @ ${s.weight}${s.unit}`).join("\n")}`;
+    const fmtSet=s=>s.weight?`${s.sets}×${s.reps} @ ${s.weight}${s.unit}`:s.reps?`${s.sets}×${s.reps}`:`${s.sets} sets`;
+    const reply=`✅ Workout logged!\n${sets.map(s=>`  • ${s.exercise}: ${fmtSet(s)}`).join("\n")}`;
     setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"workout"}]);
   }
 
@@ -697,7 +699,7 @@ export default function FitLog(){
                   {workout.sets.map((s,si)=>(
                     <div key={si} style={{...rowSt,gap:10}}>
                       <span style={{textTransform:"capitalize",color:C.accent,fontWeight:600,cursor:"pointer",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} onClick={()=>setTab("lifts")}>{s.exercise}</span>
-                      <span style={{color:C.text,fontWeight:600,flexShrink:0,fontSize:14}}>{s.sets}×{s.reps} @ {s.weight}{s.unit}</span>
+                      <span style={{color:C.text,fontWeight:600,flexShrink:0,fontSize:14}}>{s.weight?`${s.sets}×${s.reps} @ ${s.weight}${s.unit}`:s.reps?`${s.sets}×${s.reps}`:`${s.sets} sets`}</span>
                       <DeleteBtn onDelete={()=>deleteWorkoutEntry(workout.timestamp)} style={{marginLeft:4}}/>
                     </div>
                   ))}
