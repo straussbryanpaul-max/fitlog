@@ -565,9 +565,13 @@ export default function FitLog(){
         setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
 
       }else if(parsed.type==="workout"){
-        setMessages(prev=>[...prev,{role:"assistant",content:"Got it! Just one sec...",type:"info"}]);
-        processExQueue(parsed.sets,[],exerciseMap);
-        reply="Workout processed.";
+        if(!parsed.sets?.length){
+          reply="I couldn't parse any exercises from that. Try: \"bench 3x8 @ 185\" or \"chest - bench press - 3x8 @ 185\"";
+          setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);
+        }else{
+          processExQueue(parsed.sets,[],exerciseMap);
+          reply="Workout processed."; // commitWorkout appends the real ✅ message
+        }
 
       }else if(parsed.type==="nutrition_known"){
         const item={name:parsed.name,calories:Math.round(parsed.calories*(parsed.servings||1)),protein_g:Math.round(parsed.protein_g*(parsed.servings||1)),carbs_g:Math.round(parsed.carbs_g*(parsed.servings||1)),fat_g:Math.round(parsed.fat_g*(parsed.servings||1)),quantity:`${parsed.servings||1} serving${(parsed.servings||1)!==1?"s":""}`};
