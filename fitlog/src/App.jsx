@@ -289,7 +289,7 @@ function FoodsTab({customFoods,onDelete,onLog}){
 }
 
 // ── Lifts tab ─────────────────────────────────────────────────────────────────
-function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet,weeklySets}){
+function LiftsTab({workouts,exerciseMap,muscleOverrides={},onDeleteWorkout,onDeleteSet,weeklySets}){
   const[search,setSearch]=useState("");
   const[selected,setSelected]=useState(null);
   const[expandedMuscle,setExpandedMuscle]=useState(null);
@@ -729,7 +729,7 @@ export default function FitLog(){
         </div>
       )}
 
-      {tab==="lifts"&&<LiftsTab workouts={workouts} exerciseMap={exerciseMap} onDeleteWorkout={deleteWorkoutEntry} onDeleteSet={deleteWorkoutSet} weeklySets={weeklySets}/>}
+      {tab==="lifts"&&<LiftsTab workouts={workouts} exerciseMap={exerciseMap} muscleOverrides={muscleOverrides} onDeleteWorkout={deleteWorkoutEntry} onDeleteSet={deleteWorkoutSet} weeklySets={weeklySets}/>}
 
       {tab==="foods"&&(
         <FoodsTab
