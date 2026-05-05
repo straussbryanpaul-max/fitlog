@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
   templates: "fitlog_templates",
   exerciseMap: "fitlog_exercise_map",
   customFoods: "fitlog_custom_foods",
+  muscleOverrides: "fitlog_muscle_overrides",
 };
 
 const DEFAULT_GOALS = { calories: 2200, protein_g: 160, carbs_g: 220, fat_g: 70, carbFatSplit: 60 };
@@ -21,18 +22,28 @@ function calcMacros(calories,protein_g,carbPct){const rem=Math.max(0,calories-pr
 function load(key,fb){try{return JSON.parse(localStorage.getItem(key))??fb;}catch{return fb;}}
 function save(key,data){localStorage.setItem(key,JSON.stringify(data));}
 const MUSCLE_MAP = {
-  "bench press":"chest","incline bench press":"chest","decline bench press":"chest","chest press":"chest","push up":"chest","dip":"chest","cable fly":"chest","pec deck":"chest","fly":"chest","chest":"chest","bench":"chest",
-  "overhead press":"shoulders","shoulder press":"shoulders","lateral raise":"shoulders","front raise":"shoulders","face pull":"shoulders","upright row":"shoulders","arnold press":"shoulders","shoulder":"shoulders",
-  "pull-up":"back","chin-up":"back","barbell row":"back","lat pulldown":"back","seated row":"back","cable row":"back","t-bar row":"back","deadlift":"back","romanian deadlift":"back","rack pull":"back","back extension":"back","hyperextension":"back","back":"back",
-  "squat":"legs","leg press":"legs","lunge":"legs","leg extension":"legs","leg curl":"legs","hack squat":"legs","bulgarian split squat":"legs","calf raise":"legs","hip thrust":"legs","glute bridge":"legs","quad":"legs","quads":"legs","hamstring":"legs","hamstrings":"legs","glute":"legs","glutes":"legs","calf":"legs","calves":"legs",
-  "bicep curl":"biceps","hammer curl":"biceps","preacher curl":"biceps","concentration curl":"biceps","bicep":"biceps","biceps":"biceps",
-  "tricep extension":"triceps","skullcrusher":"triceps","tricep pushdown":"triceps","close grip bench":"triceps","overhead tricep extension":"triceps","rope pushdown":"triceps","cable pushdown":"triceps","tricep":"triceps","triceps":"triceps",
-  "plank":"core","crunch":"core","sit up":"core","ab rollout":"core","cable crunch":"core","leg raise":"core","ab wheel":"core","hanging knee raise":"core","russian twist":"core","abs":"core","ab":"core",
-  "run":"cardio","running":"cardio","treadmill":"cardio","bike":"cardio","cycling":"cardio","elliptical":"cardio","rowing":"cardio","stairmaster":"cardio","jump rope":"cardio","hiit":"cardio","cardio":"cardio","walk":"cardio","walking":"cardio","power walk":"cardio","power walking":"cardio",
+  // chest
+  "bench press":"chest","incline bench press":"chest","decline bench press":"chest","chest press":"chest","push up":"chest","pushup":"chest","push-up":"chest","dip":"chest","cable fly":"chest","pec deck":"chest","fly":"chest","chest":"chest","bench":"chest","pec":"chest","cable crossover":"chest","crossover":"chest","pullover":"chest","incline fly":"chest","decline fly":"chest","dumbbell fly":"chest",
+  // shoulders
+  "overhead press":"shoulders","shoulder press":"shoulders","lateral raise":"shoulders","front raise":"shoulders","face pull":"shoulders","upright row":"shoulders","arnold press":"shoulders","shoulder":"shoulders","lateral":"shoulders","rear delt":"shoulders","rear fly":"shoulders","reverse fly":"shoulders","delt":"shoulders","shrug":"shoulders",
+  // back
+  "pull-up":"back","chin-up":"back","barbell row":"back","lat pulldown":"back","seated row":"back","cable row":"back","t-bar row":"back","deadlift":"back","romanian deadlift":"back","rack pull":"back","back extension":"back","hyperextension":"back","back":"back","pulldown":"back","chin up":"back","t-bar":"back","pull down":"back","straight arm pulldown":"back","straight arm":"back","lat pull":"back",
+  // legs
+  "squat":"legs","leg press":"legs","lunge":"legs","leg extension":"legs","leg curl":"legs","hack squat":"legs","bulgarian split squat":"legs","calf raise":"legs","hip thrust":"legs","glute bridge":"legs","quad":"legs","quads":"legs","hamstring":"legs","hamstrings":"legs","glute":"legs","glutes":"legs","calf":"legs","calves":"legs","step up":"legs","split squat":"legs","front squat":"legs","sumo":"legs","sumo deadlift":"legs","goblet squat":"legs","rdl":"legs","nordic curl":"legs","lying leg curl":"legs","seated leg curl":"legs",
+  // biceps
+  "bicep curl":"biceps","hammer curl":"biceps","preacher curl":"biceps","concentration curl":"biceps","bicep":"biceps","biceps":"biceps","curl":"biceps","cable curl":"biceps","incline curl":"biceps","spider curl":"biceps",
+  // triceps
+  "tricep extension":"triceps","skullcrusher":"triceps","skull crusher":"triceps","tricep pushdown":"triceps","close grip bench":"triceps","overhead tricep extension":"triceps","rope pushdown":"triceps","cable pushdown":"triceps","tricep":"triceps","triceps":"triceps","pushdown":"triceps","kickback":"triceps","tricep kickback":"triceps","close grip":"triceps","overhead extension":"triceps","skull":"triceps",
+  // core
+  "plank":"core","crunch":"core","sit up":"core","ab rollout":"core","cable crunch":"core","leg raise":"core","ab wheel":"core","hanging knee raise":"core","russian twist":"core","abs":"core","ab":"core","hollow body":"core","dead bug":"core","mountain climber":"core","flutter kick":"core","hanging leg raise":"core","dragon flag":"core",
+  // cardio
+  "run":"cardio","running":"cardio","treadmill":"cardio","bike":"cardio","cycling":"cardio","elliptical":"cardio","rowing":"cardio","stairmaster":"cardio","jump rope":"cardio","hiit":"cardio","cardio":"cardio","walk":"cardio","walking":"cardio","power walk":"cardio","power walking":"cardio","swim":"cardio","swimming":"cardio","spin":"cardio","assault bike":"cardio","air bike":"cardio","rower":"cardio",
 };
 
-function getMuscleGroup(exercise){
+const VALID_MUSCLE_GROUPS=["chest","back","shoulders","legs","biceps","triceps","core","cardio"];
+function getMuscleGroup(exercise,overrides={}){
   const lower=exercise.toLowerCase().trim();
+  if(overrides[lower])return overrides[lower];
   if(MUSCLE_MAP[lower])return MUSCLE_MAP[lower];
   let best=null,bestLen=0;
   for(const[k,v]of Object.entries(MUSCLE_MAP)){if(lower.includes(k)&&k.length>bestLen){bestLen=k.length;best=v;}}
@@ -288,11 +299,11 @@ function LiftsTab({workouts,exerciseMap,onDeleteWorkout,onDeleteSet,weeklySets})
   const monday=weekMonday(liftsWeekOffset);
   const weekDays=Array.from({length:7},(_,i)=>{const d=new Date(monday+"T12:00:00");d.setDate(d.getDate()+i);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;});
   function weekLabel(){const s=new Date(monday+"T12:00:00"),e=new Date(monday+"T12:00:00");e.setDate(e.getDate()+6);const M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return s.getMonth()===e.getMonth()?`${M[s.getMonth()]} ${s.getDate()}–${e.getDate()}`:`${M[s.getMonth()]} ${s.getDate()} – ${M[e.getMonth()]} ${e.getDate()}`;}
-  const currentWeekSets={};workouts.filter(w=>weekDays.includes(w.date)).forEach(w=>{const cardioSets=w.sets.filter(s=>getMuscleGroup(resolveEx(s.exercise))==="cardio");const nonCardioSets=w.sets.filter(s=>getMuscleGroup(resolveEx(s.exercise))!=="cardio");if(cardioSets.length>0)currentWeekSets["cardio"]=(currentWeekSets["cardio"]||0)+1;nonCardioSets.forEach(s=>{const mg=getMuscleGroup(resolveEx(s.exercise));currentWeekSets[mg]=(currentWeekSets[mg]||0)+s.sets;});});const muscleOrder=["chest","back","shoulders","legs","biceps","triceps","core","cardio","other"];
+  const currentWeekSets={};workouts.filter(w=>weekDays.includes(w.date)).forEach(w=>{const cardioSets=w.sets.filter(s=>getMuscleGroup(resolveEx(s.exercise),muscleOverrides)==="cardio");const nonCardioSets=w.sets.filter(s=>getMuscleGroup(resolveEx(s.exercise),muscleOverrides)!=="cardio");if(cardioSets.length>0)currentWeekSets["cardio"]=(currentWeekSets["cardio"]||0)+1;nonCardioSets.forEach(s=>{const mg=getMuscleGroup(resolveEx(s.exercise),muscleOverrides);currentWeekSets[mg]=(currentWeekSets[mg]||0)+s.sets;});});const muscleOrder=["chest","back","shoulders","legs","biceps","triceps","core","cardio","other"];
   const weekEntries=muscleOrder.filter(m=>currentWeekSets[m]>0).map(m=>([m,currentWeekSets[m]]));const maxSets=weekEntries.length?Math.max(...weekEntries.map(([,v])=>v)):0;
-  const muscleDetail={};workouts.filter(w=>weekDays.includes(w.date)).forEach(w=>w.sets.forEach(s=>{const mg=getMuscleGroup(resolveEx(s.exercise));const ex=resolveEx(s.exercise);if(!muscleDetail[mg])muscleDetail[mg]={};if(!muscleDetail[mg][ex])muscleDetail[mg][ex]={sets:0,dates:[]};muscleDetail[mg][ex].sets+=s.sets;if(!muscleDetail[mg][ex].dates.includes(w.date))muscleDetail[mg][ex].dates.push(w.date);}));
+  const muscleDetail={};workouts.filter(w=>weekDays.includes(w.date)).forEach(w=>w.sets.forEach(s=>{const mg=getMuscleGroup(resolveEx(s.exercise),muscleOverrides);const ex=resolveEx(s.exercise);if(!muscleDetail[mg])muscleDetail[mg]={};if(!muscleDetail[mg][ex])muscleDetail[mg][ex]={sets:0,dates:[]};muscleDetail[mg][ex].sets+=s.sets;if(!muscleDetail[mg][ex].dates.includes(w.date))muscleDetail[mg][ex].dates.push(w.date);}));
   const library={};
-  workouts.forEach(w=>{w.sets.forEach(s=>{const c=resolveEx(s.exercise);if(!s.weight||s.weight===0)return;if(getMuscleGroup(c)==="cardio")return;if(!library[c])library[c]={sessions:[],aliases:new Set()};library[c].aliases.add(s.exercise.toLowerCase().trim());const ex=library[c].sessions.find(x=>x.date===w.date);if(ex){if(s.weight>ex.weight){ex.weight=s.weight;ex.reps=s.reps;ex.sets=s.sets;}}else library[c].sessions.push({date:w.date,weight:s.weight,reps:s.reps,sets:s.sets});});});
+  workouts.forEach(w=>{w.sets.forEach(s=>{const c=resolveEx(s.exercise);if(!s.weight||s.weight===0)return;if(getMuscleGroup(c,muscleOverrides)==="cardio")return;if(!library[c])library[c]={sessions:[],aliases:new Set()};library[c].aliases.add(s.exercise.toLowerCase().trim());const ex=library[c].sessions.find(x=>x.date===w.date);if(ex){if(s.weight>ex.weight){ex.weight=s.weight;ex.reps=s.reps;ex.sets=s.sets;}}else library[c].sessions.push({date:w.date,weight:s.weight,reps:s.reps,sets:s.sets});});});
   Object.values(library).forEach(ex=>ex.sessions.sort((a,b)=>a.date.localeCompare(b.date)));
   const names=Object.keys(library).sort();
   const filtered=search.trim()?names.filter(n=>{const q=search.toLowerCase();return n.includes(q)||[...library[n].aliases].some(a=>a.includes(q));}):names;
@@ -406,7 +417,8 @@ async function callClaudeImage(base64,mediaType){
 
 const PARSE_SYSTEM=`You are FitLog. Parse input into JSON only. No plain text.
 
-Workout: {"type":"workout","sets":[{"exercise":"string","sets":number,"reps":number,"weight":number,"unit":"lbs"}]}
+Workout: {"type":"workout","sets":[{"exercise":"string","sets":number,"reps":number,"weight":number,"unit":"lbs","muscleGroup":"chest|back|shoulders|legs|biceps|triceps|core|cardio|null"}]}
+If user types "category - exercise - sets" format (e.g. "chest - incline machine press - 4x10 @ 155"), extract the category as muscleGroup and the exercise name as exercise. Valid muscleGroup values: chest, back, shoulders, legs, biceps, triceps, core, cardio. Set muscleGroup to null if not specified by the user.
 Nutrition with KNOWN macros (user stated cal/protein/carbs/fat): {"type":"nutrition_known","name":"food name","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string","meal":"breakfast"|"lunch"|"dinner"|"snack","servings":number}
 Nutrition lookup (user didn't state macros): {"type":"nutrition","items":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}],"meal":"breakfast"|"lunch"|"dinner"|"snack"}
 Bodyweight: {"type":"bodyweight","weight":number,"unit":"lbs"}
@@ -432,6 +444,7 @@ export default function FitLog(){
   const[goals,setGoals]=useState(DEFAULT_GOALS);
   const[templates,setTemplates]=useState({});
   const[exerciseMap,setExerciseMap]=useState({});
+  const[muscleOverrides,setMuscleOverrides]=useState({});
   const[customFoods,setCustomFoods]=useState({});
   const[draftCals,setDraftCals]=useState(String(DEFAULT_GOALS.calories));
   const[draftPro,setDraftPro]=useState(String(DEFAULT_GOALS.protein_g));
@@ -453,6 +466,7 @@ export default function FitLog(){
     setBW(load(STORAGE_KEYS.bodyweight,[]));
     setTemplates(load(STORAGE_KEYS.templates,{}));
     setExerciseMap(load(STORAGE_KEYS.exerciseMap,{}));
+    setMuscleOverrides(load(STORAGE_KEYS.muscleOverrides,{}));
     setCustomFoods(load(STORAGE_KEYS.customFoods,{}));
     const g=load(STORAGE_KEYS.goals,DEFAULT_GOALS);
     setGoals(g);setDraftCals(String(g.calories));setDraftPro(String(g.protein_g));setDraftSplit(g.carbFatSplit??60);
@@ -468,25 +482,30 @@ export default function FitLog(){
   function deleteWorkoutEntry(timestamp){const updated=workouts.filter(w=>w.timestamp!==timestamp);setWorkouts(updated);save(STORAGE_KEYS.workouts,updated);}
   function deleteWorkoutSet(date,exerciseName){const updated=workouts.map(w=>{if(w.date!==date)return w;const newSets=w.sets.filter(s=>{const resolved=resolveEx(s.exercise);return resolved!==exerciseName&&s.exercise.toLowerCase().trim()!==exerciseName;});return{...w,sets:newSets};}).filter(w=>w.sets.length>0);setWorkouts(updated);save(STORAGE_KEYS.workouts,updated);}
 
-  function commitWorkout(sets){
+  function commitWorkout(sets,overrides=muscleOverrides){
     const entry={date:selectedDate,timestamp:Date.now(),sets};
     const u=[...workouts,entry];setWorkouts(u);save(STORAGE_KEYS.workouts,u);
-    const weekKey=selectedDate.slice(0,7);const updated={...weeklySets};if(!updated[weekKey])updated[weekKey]={};sets.forEach(s=>{const mg=getMuscleGroup(s.exercise);updated[weekKey][mg]=(updated[weekKey][mg]||0)+s.sets;});setWeeklySets(updated);save(STORAGE_KEYS.weeklysets,updated);
+    const weekKey=selectedDate.slice(0,7);const updated={...weeklySets};if(!updated[weekKey])updated[weekKey]={};sets.forEach(s=>{const mg=getMuscleGroup(s.exercise,overrides);updated[weekKey][mg]=(updated[weekKey][mg]||0)+s.sets;});setWeeklySets(updated);save(STORAGE_KEYS.weeklysets,updated);
     const reply=`✅ Workout logged!\n${sets.map(s=>`  • ${s.exercise}: ${s.sets}×${s.reps} @ ${s.weight}${s.unit}`).join("\n")}`;
     setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"workout"}]);
   }
 
-  function processExQueue(queue,resolved,map){
-    if(queue.length===0){commitWorkout(resolved);setConfirmModal(null);return;}
+  function processExQueue(queue,resolved,map,overrides=muscleOverrides){
+    if(queue.length===0){commitWorkout(resolved,overrides);setConfirmModal(null);return;}
     const[next,...rest]=queue;
     const known=getKnownExercises(map);
     const lower=next.exercise.toLowerCase().trim();
-    if(map[lower]||HARD_ALIASES[lower]){processExQueue(rest,[...resolved,{...next,exercise:resolveEx(lower,map)}],map);}
-    else{const sim=findSimilarExercise(lower,known);if(sim&&sim!==lower){setConfirmModal({incoming:lower,existing:sim,set:next,remainingQueue:rest,resolvedSets:resolved,currentMap:map});}else processExQueue(rest,[...resolved,{...next,exercise:lower}],map);}
+    if(next.muscleGroup&&VALID_MUSCLE_GROUPS.includes(next.muscleGroup)){
+      const resolvedName=resolveEx(lower,map);
+      const newOverrides={...overrides,[resolvedName]:next.muscleGroup};
+      setMuscleOverrides(newOverrides);save(STORAGE_KEYS.muscleOverrides,newOverrides);
+      processExQueue(rest,[...resolved,{...next,exercise:resolvedName}],map,newOverrides);
+    }else if(map[lower]||HARD_ALIASES[lower]){processExQueue(rest,[...resolved,{...next,exercise:resolveEx(lower,map)}],map,overrides);}
+    else{const sim=findSimilarExercise(lower,known);if(sim&&sim!==lower){setConfirmModal({incoming:lower,existing:sim,set:next,remainingQueue:rest,resolvedSets:resolved,currentMap:map,currentOverrides:overrides});}else processExQueue(rest,[...resolved,{...next,exercise:lower}],map,overrides);}
   }
 
-  function handleSameEx(){if(!confirmModal)return;const{incoming,existing,set,remainingQueue,resolvedSets,currentMap}=confirmModal;const nm={...currentMap,[incoming]:existing};setExerciseMap(nm);save(STORAGE_KEYS.exerciseMap,nm);processExQueue(remainingQueue,[...resolvedSets,{...set,exercise:existing}],nm);}
-  function handleDiffEx(){if(!confirmModal)return;const{incoming,set,remainingQueue,resolvedSets,currentMap}=confirmModal;const nm={...currentMap,[incoming]:incoming};setExerciseMap(nm);save(STORAGE_KEYS.exerciseMap,nm);processExQueue(remainingQueue,[...resolvedSets,{...set,exercise:incoming}],nm);}
+  function handleSameEx(){if(!confirmModal)return;const{incoming,existing,set,remainingQueue,resolvedSets,currentMap,currentOverrides=muscleOverrides}=confirmModal;const nm={...currentMap,[incoming]:existing};setExerciseMap(nm);save(STORAGE_KEYS.exerciseMap,nm);processExQueue(remainingQueue,[...resolvedSets,{...set,exercise:existing}],nm,currentOverrides);}
+  function handleDiffEx(){if(!confirmModal)return;const{incoming,set,remainingQueue,resolvedSets,currentMap,currentOverrides=muscleOverrides}=confirmModal;const nm={...currentMap,[incoming]:incoming};setExerciseMap(nm);save(STORAGE_KEYS.exerciseMap,nm);processExQueue(remainingQueue,[...resolvedSets,{...set,exercise:incoming}],nm,currentOverrides);}
 
   function logFoodItem(item,meal,promptSave=false){
     const entry={date:selectedDate,timestamp:Date.now(),meal,items:[item]};
