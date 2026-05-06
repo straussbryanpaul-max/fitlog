@@ -432,9 +432,10 @@ Unclear: {"type":"unclear","response":"string"}
 
 IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type.
 For nutrition lookups — follow this priority order:
-1. If the food appears in CUSTOM FOODS or FOOD HISTORY (injected below), use those exact macros. Do NOT search.
-2. For simple whole foods (plain chicken breast, plain rice, fresh fruit, raw vegetables) — estimate from your training knowledge.
-3. For ANY branded, packaged, restaurant, or processed food NOT in history — you MUST use web_search to find accurate macros. Never guess 0 for calories. Return ONLY the JSON object even after searching.`;
+1. If the food appears in CUSTOM FOODS (injected below), return {"type":"use_custom_food",...} — NEVER return type "nutrition" for custom foods, even if you think you know better macros.
+2. If the food appears in FOOD HISTORY (injected below), use those exact macros with type "nutrition".
+3. For simple whole foods (plain chicken breast, plain rice, fresh fruit, raw vegetables) — estimate from your training knowledge.
+4. For ANY branded, packaged, restaurant, or processed food NOT in custom foods or history — you MUST use web_search to find accurate macros. Never guess 0 for calories. Return ONLY the JSON object even after searching.`;
 
 function buildFoodContext(customFoods, nutritionHistory) {
   const parts = [];
@@ -444,12 +445,14 @@ function buildFoodContext(customFoods, nutritionHistory) {
       `- "${f.name}": ${f.calories}cal | ${f.protein_g}g pro | ${f.carbs_g}g carbs | ${f.fat_g}g fat`
     ).join("\n"));
   }
+  const customKeys = Object.keys(customFoods);
   const seen = new Set();
   const histItems = [];
   for (let i = nutritionHistory.length - 1; i >= 0 && histItems.length < 50; i--) {
     nutritionHistory[i].items.forEach(item => {
       const k = item.name.toLowerCase().trim();
-      if (!seen.has(k) && item.calories > 0) { seen.add(k); histItems.push(item); }
+      const hasCF = customKeys.some(ck => fuzzyFoodMatch(k, ck) > 0.7);
+      if (!seen.has(k) && item.calories > 0 && !hasCF) { seen.add(k); histItems.push(item); }
     });
   }
   if (histItems.length > 0) {
@@ -805,7 +808,8 @@ export default function FitLog(){
             const entry={date:selectedDate,timestamp:Date.now(),meal:"snack",items:[{...food,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:food.servingUnit?`${Math.round(mult*(food.servingAmount||1))} ${food.servingUnit}`:`${mult} serving${mult!==1?"s":""}`}]};
             const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
             setTab("chat");
-            setMessages(prev=>[...prev,{role:"assistant",content:`✅ ${food.name} logged!\n${food.calories} cal | ${food.protein_g}g protein | ${food.carbs_g}g carbs | ${food.fat_g}g fat`,type:"nutrition"}]);
+            const logged={calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult)};
+            setMessages(prev=>[...prev,{role:"assistant",content:`✅ ${food.name} logged!\n${logged.calories} cal | ${logged.protein_g}g protein | ${logged.carbs_g}g carbs | ${logged.fat_g}g fat`,type:"nutrition"}]);
           }}
         />
       )}
