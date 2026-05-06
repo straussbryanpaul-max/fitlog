@@ -622,6 +622,24 @@ export default function FitLog(){
         logFoodItem(item,parsed.meal||"snack",true);reply=`logged ${item.name}`;
 
       }else if(parsed.type==="nutrition"){
+       // Client-side override: if any item matches a custom food, use custom food macros
+       // (Claude sometimes web-searches and ignores the custom food instruction)
+       parsed.items=parsed.items.map(item=>{
+         const k=item.name.toLowerCase().trim();
+         const cfKey=Object.keys(customFoods).find(ck=>fuzzyFoodMatch(k,ck)>0.65);
+         if(!cfKey)return item;
+         const cf=customFoods[cfKey];
+         let mult=1;
+         if(cf.servingUnit&&item.quantity){
+           const unitRe=new RegExp(`(\\d+\\.?\\d*)\\s*${cf.servingUnit}s?`,'i');
+           const m=item.quantity.match(unitRe);
+           if(m)mult=parseFloat(m[1])/(cf.servingAmount||1);
+         }else{
+           const numM=(item.quantity||"").match(/^(\d+\.?\d*)/);
+           if(numM)mult=parseFloat(numM[1]);
+         }
+         return{...item,name:cf.name,calories:Math.round(cf.calories*mult),protein_g:Math.round(cf.protein_g*mult),carbs_g:Math.round(cf.carbs_g*mult),fat_g:Math.round(cf.fat_g*mult)};
+       });
        // If any item has 0 calories, do a targeted web-search retry for those items
        const zeroItems=parsed.items.filter(i=>i.calories===0);
        if(zeroItems.length>0){
