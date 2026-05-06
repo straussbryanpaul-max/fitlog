@@ -430,7 +430,46 @@ Create custom food from ingredients: {"type":"create_custom_food","name":"string
 Trend/analysis question: {"type":"query"}
 Unclear: {"type":"unclear","response":"string"}
 
-IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type. For ANY branded, packaged, or processed food — always use web search to find accurate macros before responding. Only estimate for simple whole foods like plain chicken breast, plain rice, fresh fruit, vegetables. When in doubt, search.`;
+IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type.
+For nutrition lookups — follow this priority order:
+1. If the food appears in CUSTOM FOODS or FOOD HISTORY (injected below), use those exact macros. Do NOT search.
+2. For simple whole foods (plain chicken breast, plain rice, fresh fruit, raw vegetables) — estimate from your training knowledge.
+3. For ANY branded, packaged, restaurant, or processed food NOT in history — you MUST use web_search to find accurate macros. Never guess 0 for calories. Return ONLY the JSON object even after searching.`;
+
+function buildFoodContext(customFoods, nutritionHistory) {
+  const parts = [];
+  const customList = Object.values(customFoods).slice(0, 30);
+  if (customList.length > 0) {
+    parts.push("CUSTOM FOODS:\n" + customList.map(f =>
+      `- "${f.name}": ${f.calories}cal | ${f.protein_g}g pro | ${f.carbs_g}g carbs | ${f.fat_g}g fat`
+    ).join("\n"));
+  }
+  const seen = new Set();
+  const histItems = [];
+  for (let i = nutritionHistory.length - 1; i >= 0 && histItems.length < 50; i--) {
+    nutritionHistory[i].items.forEach(item => {
+      const k = item.name.toLowerCase().trim();
+      if (!seen.has(k) && item.calories > 0) { seen.add(k); histItems.push(item); }
+    });
+  }
+  if (histItems.length > 0) {
+    parts.push("FOOD HISTORY (use these macros for same/similar items):\n" + histItems.map(f =>
+      `- "${f.name}": ${f.calories}cal | ${f.protein_g}g pro | ${f.carbs_g}g carbs | ${f.fat_g}g fat (${f.quantity})`
+    ).join("\n"));
+  }
+  return parts.length ? parts.join("\n\n") : "";
+}
+
+function fuzzyFoodMatch(a, b) {
+  a = a.toLowerCase().trim(); b = b.toLowerCase().trim();
+  if (a === b) return 1.0;
+  if (a.includes(b) || b.includes(a)) return 0.9;
+  const aW = new Set(a.split(/\s+/).filter(w => w.length > 2));
+  const bW = new Set(b.split(/\s+/).filter(w => w.length > 2));
+  if (!aW.size || !bW.size) return 0;
+  const overlap = [...aW].filter(w => bW.has(w)).length;
+  return overlap / Math.max(aW.size, bW.size);
+}
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function FitLog(){
@@ -551,7 +590,9 @@ export default function FitLog(){
     try{
       if(pendingLog&&/^(yes|y|yep|yup|correct|log it|looks good|log|right|ok|sure)$/i.test(userMsg.trim())){const now=Date.now();const newEntries=pendingLog.items.map((item,idx)=>({date:selectedDate,timestamp:now+idx,meal:pendingLog.meal,items:[item]}));const updatedNutrition=[...nutrition,...newEntries];setNutrition(updatedNutrition);save(STORAGE_KEYS.nutrition,updatedNutrition);pendingLog.items.forEach((item,idx)=>{const reply=`✅ ${pendingLog.meal.charAt(0).toUpperCase()+pendingLog.meal.slice(1)} logged!\n  • ${item.quantity} ${item.name}: ${item.calories} cal\n${item.protein_g}g protein · ${item.carbs_g}g carbs · ${item.fat_g}g fat`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);if(idx===0&&!customFoods[item.name.toLowerCase()]){setSaveFoodPrompt({food:item,meal:pendingLog.meal});}});setPendingLog(null);setLoading(false);return;}
       if(pendingLog&&/^(no|nope|wrong|incorrect|cancel)$/i.test(userMsg.trim())){setPendingLog(null);setMessages(prev=>[...prev,{role:"assistant",content:"No problem, what should I correct?",type:"info"}]);setLoading(false);return;}
-      const text=await callClaudeText(userMsg,context,PARSE_SYSTEM);
+      const foodCtx=buildFoodContext(customFoods,nutrition);
+      const fullParseSystem=PARSE_SYSTEM+(foodCtx?"\n\n"+foodCtx:"");
+      const text=await callClaudeText(userMsg,context,fullParseSystem,true);
       let parsed;
       try{parsed=JSON.parse(text.replace(/```json|```/g,"").trim());}
       catch{parsed={type:"unclear",response:""};}
@@ -578,11 +619,30 @@ export default function FitLog(){
         logFoodItem(item,parsed.meal||"snack",true);reply=`logged ${item.name}`;
 
       }else if(parsed.type==="nutrition"){
+       // If any item has 0 calories, do a targeted web-search retry for those items
+       const zeroItems=parsed.items.filter(i=>i.calories===0);
+       if(zeroItems.length>0){
+         try{
+           const lookupQ=zeroItems.map(i=>`${i.quantity} ${i.name}`).join(", ");
+           const lookupSys=`You are a nutrition lookup assistant. Use web search to find accurate macros for the given foods. Return ONLY valid JSON: {"items":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}. No markdown, no preamble.`;
+           const lookupText=await callClaudeText(`Find accurate nutrition macros for: ${lookupQ}`,[],lookupSys,true);
+           const lookupParsed=JSON.parse(lookupText.replace(/```json|```/g,"").trim());
+           if(lookupParsed.items){
+             const lookupMap=Object.fromEntries(lookupParsed.items.map(i=>[i.name.toLowerCase(),i]));
+             parsed.items=parsed.items.map(i=>{
+               if(i.calories>0)return i;
+               const lk=Object.keys(lookupMap).find(k=>fuzzyFoodMatch(i.name,k)>0.5);
+               return lk?{...i,...lookupMap[lk],quantity:i.quantity||lookupMap[lk].quantity}:i;
+             });
+           }
+         }catch{}
+       }
        setPendingLog({items:parsed.items,meal:parsed.meal});const preview=parsed.items.map(i=>`\u2022 ${i.quantity} ${i.name}: ${i.calories} cal | ${i.protein_g}g protein | ${i.carbs_g}g carbs | ${i.fat_g}g fat`).join("\n");reply=`${preview}\n\nLog this?`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
 
       }else if(parsed.type==="use_custom_food"){
         const key=(parsed.name||"").toLowerCase();
-        const match=Object.keys(customFoods).find(k=>key.includes(k)||k.includes(key));
+        const bestMatch=Object.keys(customFoods).reduce((best,k)=>{const score=fuzzyFoodMatch(key,k);return score>best.score?{key:k,score}:best;},{key:null,score:0.45});
+        const match=bestMatch.key;
         if(match){const food=customFoods[match];let mult=parsed.servings||1;if(parsed.amount&&parsed.unit&&food.servingUnit&&parsed.unit.toLowerCase().includes(food.servingUnit.toLowerCase())){mult=parsed.amount/food.servingAmount;}const item={name:food.name,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:parsed.amount&&parsed.unit?`${parsed.amount} ${parsed.unit}`:`${mult} serving${mult!==1?"s":""}`};logFoodItem(item,parsed.meal||"snack",false);reply=`logged ${item.name}`;}
         else{reply=`I don't have "${parsed.name}" in your Foods library yet.`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);}
       }else if(parsed.type==="create_custom_food"){
