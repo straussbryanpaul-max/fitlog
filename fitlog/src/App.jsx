@@ -425,8 +425,8 @@ Nutrition lookup (user didn't state macros): {"type":"nutrition","items":[{"name
 Bodyweight: {"type":"bodyweight","weight":number,"unit":"lbs"}
 Save template: {"type":"save_template","name":"string","meal":"breakfast"|"lunch"|"dinner"|"snack","items":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}
 Use template: {"type":"use_template","name":"string","servings":number}
-Use custom food: {"type":"use_custom_food","name":"string","servings":number,"meal":"breakfast"|"lunch"|"dinner"|"snack"}
-  servings = number of STORED SERVINGS (not piece count). Use the serving size shown in CUSTOM FOODS to convert: if "prunes" is 5 prunes/serving and user says "5 prunes" → servings:1. If user says "10 prunes" → servings:2.
+Use custom food: {"type":"use_custom_food","name":"string","servings":number,"amount":number,"unit":"string","meal":"breakfast"|"lunch"|"dinner"|"snack"}
+  Use amount+unit for countable items ("5 prunes" → amount:5, unit:"prunes", servings:1). servings = full serving multiplier only when user says "2 servings" etc.
 Create custom food from ingredients: {"type":"create_custom_food","name":"string","ingredients":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}
 Trend/analysis question: {"type":"query"}
 Unclear: {"type":"unclear","response":"string"}
@@ -666,7 +666,17 @@ export default function FitLog(){
         const key=(parsed.name||"").toLowerCase();
         const bestMatch=Object.keys(customFoods).reduce((best,k)=>{const score=fuzzyFoodMatch(key,k);return score>best.score?{key:k,score}:best;},{key:null,score:0.45});
         const match=bestMatch.key;
-        if(match){const food=customFoods[match];const mult=parsed.servings||1;const item={name:food.name,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:parsed.amount&&parsed.unit?`${parsed.amount} ${parsed.unit}`:`${mult} serving${mult!==1?"s":""}`};logFoodItem(item,parsed.meal||"snack",false);reply=`logged ${item.name}`;}
+        if(match){const food=customFoods[match];let mult=parsed.servings||1;
+          if(parsed.amount&&parsed.unit){
+            if(food.servingUnit&&parsed.unit.toLowerCase().includes(food.servingUnit.toLowerCase())){
+              mult=parsed.amount/getServingBase(food);
+            }else if(!food.servingUnit&&food.servingSize){
+              const sRe=new RegExp(`(\\d+\\.?\\d*)\\s*${parsed.unit}s?`,'i');
+              const sm=food.servingSize.match(sRe);
+              if(sm){const base=parseFloat(sm[1]);if(base>0)mult=parsed.amount/base;}
+            }
+          }
+          const item={name:food.name,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:parsed.amount&&parsed.unit?`${parsed.amount} ${parsed.unit}`:`${mult} serving${mult!==1?"s":""}`};logFoodItem(item,parsed.meal||"snack",false);reply=`logged ${item.name}`;}
         else{reply=`I don't have "${parsed.name}" in your Foods library yet.`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);}
       }else if(parsed.type==="create_custom_food"){
         const totals=parsed.ingredients.reduce((a,i)=>({calories:a.calories+(i.calories||0),protein_g:a.protein_g+(i.protein_g||0),carbs_g:a.carbs_g+(i.carbs_g||0),fat_g:a.fat_g+(i.fat_g||0)}),{calories:0,protein_g:0,carbs_g:0,fat_g:0});
