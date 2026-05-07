@@ -434,35 +434,16 @@ Unclear: {"type":"unclear","response":"string"}
 IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type.
 For nutrition lookups — follow this priority order:
 1. If the food appears in CUSTOM FOODS (injected below), return {"type":"use_custom_food",...} — NEVER return type "nutrition" for custom foods, even if you think you know better macros.
-2. If the food appears in FOOD HISTORY (injected below), use those exact macros with type "nutrition".
-3. For simple whole foods (plain chicken breast, plain rice, fresh fruit, raw vegetables) — estimate from your training knowledge.
-4. For ANY branded, packaged, restaurant, or processed food NOT in custom foods or history — you MUST use web_search to find accurate macros. Never guess 0 for calories. Return ONLY the JSON object even after searching.`;
+2. For simple whole foods (plain chicken breast, plain rice, fresh fruit, raw vegetables) — estimate from your training knowledge.
+3. For ANY branded, packaged, restaurant, or processed food NOT in custom foods — you MUST use web_search to find accurate macros. Never guess 0 for calories. Return ONLY the JSON object even after searching.`;
 
-function buildFoodContext(customFoods, nutritionHistory) {
-  const parts = [];
+function buildFoodContext(customFoods) {
   const customList = Object.values(customFoods).slice(0, 30);
-  if (customList.length > 0) {
-    parts.push("CUSTOM FOODS:\n" + customList.map(f => {
-      const srv = f.servingUnit ? `${getServingBase(f)} ${f.servingUnit} per serving` : (f.servingSize || "1 serving");
-      return `- "${f.name}": ${f.calories}cal per serving (${srv}) | ${f.protein_g}g pro | ${f.carbs_g}g carbs | ${f.fat_g}g fat`;
-    }).join("\n"));
-  }
-  const customKeys = Object.keys(customFoods);
-  const seen = new Set();
-  const histItems = [];
-  for (let i = nutritionHistory.length - 1; i >= 0 && histItems.length < 50; i--) {
-    nutritionHistory[i].items.forEach(item => {
-      const k = item.name.toLowerCase().trim();
-      const hasCF = customKeys.some(ck => fuzzyFoodMatch(k, ck) > 0.7);
-      if (!seen.has(k) && item.calories > 0 && !hasCF) { seen.add(k); histItems.push(item); }
-    });
-  }
-  if (histItems.length > 0) {
-    parts.push("FOOD HISTORY (use these macros for same/similar items):\n" + histItems.map(f =>
-      `- "${f.name}": ${f.calories}cal | ${f.protein_g}g pro | ${f.carbs_g}g carbs | ${f.fat_g}g fat (${f.quantity})`
-    ).join("\n"));
-  }
-  return parts.length ? parts.join("\n\n") : "";
+  if (!customList.length) return "";
+  return "CUSTOM FOODS:\n" + customList.map(f => {
+    const srv = f.servingUnit ? `${getServingBase(f)} ${f.servingUnit} per serving` : (f.servingSize || "1 serving");
+    return `- "${f.name}": ${f.calories}cal per serving (${srv}) | ${f.protein_g}g pro | ${f.carbs_g}g carbs | ${f.fat_g}g fat`;
+  }).join("\n");
 }
 
 // Returns how many units constitute one "serving" for a custom food.
@@ -616,7 +597,7 @@ export default function FitLog(){
     try{
       if(pendingLog&&/^(yes|y|yep|yup|correct|log it|looks good|log|right|ok|sure)$/i.test(userMsg.trim())){const now=Date.now();const newEntries=pendingLog.items.map((item,idx)=>({date:selectedDate,timestamp:now+idx,meal:pendingLog.meal,items:[item]}));const updatedNutrition=[...nutrition,...newEntries];setNutrition(updatedNutrition);save(STORAGE_KEYS.nutrition,updatedNutrition);pendingLog.items.forEach((item,idx)=>{const reply=`✅ ${pendingLog.meal.charAt(0).toUpperCase()+pendingLog.meal.slice(1)} logged!\n  • ${item.quantity} ${item.name}: ${item.calories} cal\n${item.protein_g}g protein · ${item.carbs_g}g carbs · ${item.fat_g}g fat`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);if(idx===0&&!customFoods[item.name.toLowerCase()]){setSaveFoodPrompt({food:item,meal:pendingLog.meal});}});setPendingLog(null);setLoading(false);return;}
       if(pendingLog&&/^(no|nope|wrong|incorrect|cancel)$/i.test(userMsg.trim())){setPendingLog(null);setMessages(prev=>[...prev,{role:"assistant",content:"No problem, what should I correct?",type:"info"}]);setLoading(false);return;}
-      const foodCtx=buildFoodContext(customFoods,nutrition);
+      const foodCtx=buildFoodContext(customFoods);
       const fullParseSystem=PARSE_SYSTEM+(foodCtx?"\n\n"+foodCtx:"");
       const text=await callClaudeText(userMsg,context,fullParseSystem,true);
       let parsed;
