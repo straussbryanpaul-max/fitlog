@@ -425,7 +425,8 @@ Nutrition lookup (user didn't state macros): {"type":"nutrition","items":[{"name
 Bodyweight: {"type":"bodyweight","weight":number,"unit":"lbs"}
 Save template: {"type":"save_template","name":"string","meal":"breakfast"|"lunch"|"dinner"|"snack","items":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}
 Use template: {"type":"use_template","name":"string","servings":number}
-Use custom food: {"type":"use_custom_food","name":"string","servings":number,"meal":"breakfast"|"lunch"|"dinner"|"snack"}
+Use custom food: {"type":"use_custom_food","name":"string","servings":number,"amount":number,"unit":"string","meal":"breakfast"|"lunch"|"dinner"|"snack"}
+  servings = number of full servings (use when user says "2 servings" or just a plain number like "1"). amount+unit = countable items ("5 prunes" → amount:5,unit:"prunes",servings:1). Never put a piece/item count in servings.
 Create custom food from ingredients: {"type":"create_custom_food","name":"string","ingredients":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}
 Trend/analysis question: {"type":"query"}
 Unclear: {"type":"unclear","response":"string"}
@@ -655,9 +656,6 @@ export default function FitLog(){
            const unitRe=new RegExp(`(\\d+\\.?\\d*)\\s*${cf.servingUnit}s?`,'i');
            const m=item.quantity.match(unitRe);
            if(m)mult=parseFloat(m[1])/getServingBase(cf);
-         }else{
-           const numM=(item.quantity||"").match(/^(\d+\.?\d*)/);
-           if(numM)mult=parseFloat(numM[1]);
          }
          return{...item,name:cf.name,calories:Math.round(cf.calories*mult),protein_g:Math.round(cf.protein_g*mult),carbs_g:Math.round(cf.carbs_g*mult),fat_g:Math.round(cf.fat_g*mult)};
        });
