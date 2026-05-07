@@ -269,7 +269,7 @@ function FoodsTab({customFoods,onDelete,onLog}){
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
             <div style={{fontSize:16,fontWeight:600,color:C.text,textTransform:"capitalize",flex:1}}>{food.name}</div>
             <div style={{display:"flex",gap:8}}>
-              <div style={{display:"flex",gap:6,alignItems:"center"}}>               <input                 type="number"                 placeholder={food.servingUnit?`# ${food.servingUnit}`:"servings"}                 style={{...inp,width:90,padding:"6px 8px",fontSize:13,textAlign:"center"}}                 id={`log-amt-${food.name}`}               />               <button style={{background:C.accent,border:"none",borderRadius:8,padding:"6px 14px",color:"#fff",fontSize:13,fontWeight:700,fontFamily:"inherit",cursor:"pointer"}} onClick={()=>{const el=document.getElementById(`log-amt-${food.name}`);const val=parseFloat(el?.value)||1;const mult=food.servingUnit&&food.servingAmount?val/food.servingAmount:val;onLog(food,mult);}}>Log</button>             </div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>               <input                 type="number"                 placeholder={food.servingUnit?`# ${food.servingUnit}`:"servings"}                 style={{...inp,width:90,padding:"6px 8px",fontSize:13,textAlign:"center"}}                 id={`log-amt-${food.name}`}               />               <button style={{background:C.accent,border:"none",borderRadius:8,padding:"6px 14px",color:"#fff",fontSize:13,fontWeight:700,fontFamily:"inherit",cursor:"pointer"}} onClick={()=>{const el=document.getElementById(`log-amt-${food.name}`);const val=parseFloat(el?.value)||1;const mult=food.servingUnit?val/getServingBase(food):val;onLog(food,mult);}}>Log</button>             </div>
               <button style={{background:C.redLight,border:`1px solid ${C.red}`,borderRadius:8,padding:"6px 10px",color:C.red,fontSize:13,fontFamily:"inherit",cursor:"pointer"}} onClick={()=>onDelete(food.name)}>✕</button>
             </div>
           </div>
@@ -463,6 +463,19 @@ function buildFoodContext(customFoods, nutritionHistory) {
   return parts.length ? parts.join("\n\n") : "";
 }
 
+// Returns how many units constitute one "serving" for a custom food.
+// Prefers the count embedded in servingSize ("20 crisps" → 20) over the raw
+// servingAmount field, because saved foods may have a stale servingAmount from
+// the label scan that doesn't match the scaled calories stored.
+function getServingBase(food) {
+  if (food.servingUnit && food.servingSize) {
+    const re = new RegExp(`(\\d+\\.?\\d*)\\s*${food.servingUnit}s?`, 'i');
+    const m = food.servingSize.match(re);
+    if (m) return parseFloat(m[1]);
+  }
+  return food.servingAmount || 1;
+}
+
 function fuzzyFoodMatch(a, b) {
   a = a.toLowerCase().trim(); b = b.toLowerCase().trim();
   if (a === b) return 1.0;
@@ -561,7 +574,15 @@ export default function FitLog(){
 
   function saveCustomFood(food){
     const key=food.name.toLowerCase();
-    const updated={...customFoods,[key]:{...food,servingSize:food.quantity||"1 serving",servingUnit:food.servingUnit||null,servingAmount:food.servingAmount||1}};
+    // Align servingAmount to the unit count in the logged quantity so future
+    // calculations don't apply a stale multiplier from the original label scan.
+    let servingAmt=food.servingAmount||1;
+    if(food.servingUnit&&food.quantity){
+      const re=new RegExp(`(\\d+\\.?\\d*)\\s*${food.servingUnit}s?`,'i');
+      const m=food.quantity.match(re);
+      if(m)servingAmt=parseFloat(m[1])||servingAmt;
+    }
+    const updated={...customFoods,[key]:{...food,servingSize:food.quantity||"1 serving",servingUnit:food.servingUnit||null,servingAmount:servingAmt}};
     setCustomFoods(updated);save(STORAGE_KEYS.customFoods,updated);
     setMessages(prev=>[...prev,{role:"assistant",content:`📌 "${food.name}" saved to your Foods library.`,type:"info"}]);
     setSaveFoodPrompt(null);
@@ -633,7 +654,7 @@ export default function FitLog(){
          if(cf.servingUnit&&item.quantity){
            const unitRe=new RegExp(`(\\d+\\.?\\d*)\\s*${cf.servingUnit}s?`,'i');
            const m=item.quantity.match(unitRe);
-           if(m)mult=parseFloat(m[1])/(cf.servingAmount||1);
+           if(m)mult=parseFloat(m[1])/getServingBase(cf);
          }else{
            const numM=(item.quantity||"").match(/^(\d+\.?\d*)/);
            if(numM)mult=parseFloat(numM[1]);
@@ -664,7 +685,7 @@ export default function FitLog(){
         const key=(parsed.name||"").toLowerCase();
         const bestMatch=Object.keys(customFoods).reduce((best,k)=>{const score=fuzzyFoodMatch(key,k);return score>best.score?{key:k,score}:best;},{key:null,score:0.45});
         const match=bestMatch.key;
-        if(match){const food=customFoods[match];let mult=parsed.servings||1;if(parsed.amount&&parsed.unit&&food.servingUnit&&parsed.unit.toLowerCase().includes(food.servingUnit.toLowerCase())){mult=parsed.amount/food.servingAmount;}const item={name:food.name,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:parsed.amount&&parsed.unit?`${parsed.amount} ${parsed.unit}`:`${mult} serving${mult!==1?"s":""}`};logFoodItem(item,parsed.meal||"snack",false);reply=`logged ${item.name}`;}
+        if(match){const food=customFoods[match];let mult=parsed.servings||1;if(parsed.amount&&parsed.unit&&food.servingUnit&&parsed.unit.toLowerCase().includes(food.servingUnit.toLowerCase())){mult=parsed.amount/getServingBase(food);}const item={name:food.name,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:parsed.amount&&parsed.unit?`${parsed.amount} ${parsed.unit}`:`${mult} serving${mult!==1?"s":""}`};logFoodItem(item,parsed.meal||"snack",false);reply=`logged ${item.name}`;}
         else{reply=`I don't have "${parsed.name}" in your Foods library yet.`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);}
       }else if(parsed.type==="create_custom_food"){
         const totals=parsed.ingredients.reduce((a,i)=>({calories:a.calories+(i.calories||0),protein_g:a.protein_g+(i.protein_g||0),carbs_g:a.carbs_g+(i.carbs_g||0),fat_g:a.fat_g+(i.fat_g||0)}),{calories:0,protein_g:0,carbs_g:0,fat_g:0});
