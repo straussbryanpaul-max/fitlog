@@ -462,12 +462,18 @@ function getServingBase(food) {
 function fuzzyFoodMatch(a, b) {
   a = a.toLowerCase().trim(); b = b.toLowerCase().trim();
   if (a === b) return 1.0;
-  if (a.includes(b) || b.includes(a)) return 0.9;
+  // Substring counts only when the shorter string is most of the longer one,
+  // so "shake" can't shadow "elevation protein shake".
+  if (a.includes(b) || b.includes(a)) {
+    const ratio = Math.min(a.length, b.length) / Math.max(a.length, b.length);
+    if (ratio >= 0.6) return 0.9;
+  }
   const aW = new Set(a.split(/\s+/).filter(w => w.length > 2));
   const bW = new Set(b.split(/\s+/).filter(w => w.length > 2));
   if (!aW.size || !bW.size) return 0;
-  const overlap = [...aW].filter(w => bW.has(w)).length;
-  return overlap / Math.max(aW.size, bW.size);
+  const intersect = [...aW].filter(w => bW.has(w)).length;
+  const union = new Set([...aW, ...bW]).size;
+  return intersect / union;
 }
 
 // ── Main App ──────────────────────────────────────────────────────────────────
