@@ -117,6 +117,47 @@ function DeleteBtn({ onDelete, style = {} }) {
   );
 }
 
+// ── Edit food item modal ──────────────────────────────────────────────────────
+function EditFoodModal({item,onSave,onCancel}){
+  const[name,setName]=useState(item.name||"");
+  const[quantity,setQuantity]=useState(item.quantity||"");
+  const[calories,setCalories]=useState(String(item.calories??""));
+  const[protein,setProtein]=useState(String(item.protein_g??""));
+  const[carbs,setCarbs]=useState(String(item.carbs_g??""));
+  const[fat,setFat]=useState(String(item.fat_g??""));
+  const lbl={fontSize:12,color:C.muted,display:"block",marginBottom:6,fontWeight:600};
+  const field=(c)=>({...inp,padding:"10px 12px",fontSize:15,borderColor:c||C.border});
+  function handleSave(){
+    onSave({
+      name:name.trim()||item.name,
+      quantity:quantity.trim()||item.quantity,
+      calories:Math.max(0,Math.round(parseFloat(calories)||0)),
+      protein_g:Math.max(0,Math.round(parseFloat(protein)||0)),
+      carbs_g:Math.max(0,Math.round(parseFloat(carbs)||0)),
+      fat_g:Math.max(0,Math.round(parseFloat(fat)||0)),
+    });
+  }
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,padding:24,width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:12,color:C.accent,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:14}}>Edit Item</div>
+        <div style={{marginBottom:12}}><label style={lbl}>Name</label><input style={field()} value={name} onChange={e=>setName(e.target.value)}/></div>
+        <div style={{marginBottom:12}}><label style={lbl}>Quantity</label><input style={field()} value={quantity} onChange={e=>setQuantity(e.target.value)} placeholder="e.g. 1 cup"/></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
+          <div><label style={{...lbl,color:C.amber}}>Calories</label><input style={field(C.amber)} type="number" inputMode="numeric" value={calories} onChange={e=>setCalories(e.target.value)}/></div>
+          <div><label style={{...lbl,color:C.accent}}>Protein (g)</label><input style={field(C.accent)} type="number" inputMode="numeric" value={protein} onChange={e=>setProtein(e.target.value)}/></div>
+          <div><label style={{...lbl,color:C.purple}}>Carbs (g)</label><input style={field(C.purple)} type="number" inputMode="numeric" value={carbs} onChange={e=>setCarbs(e.target.value)}/></div>
+          <div><label style={{...lbl,color:C.orange}}>Fat (g)</label><input style={field(C.orange)} type="number" inputMode="numeric" value={fat} onChange={e=>setFat(e.target.value)}/></div>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button style={{flex:1,background:C.accent,border:"none",borderRadius:12,padding:"14px 0",color:"#fff",fontWeight:700,fontFamily:"inherit",fontSize:15,cursor:"pointer"}} onClick={handleSave}>Save</button>
+          <button style={{flex:1,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"14px 0",color:C.muted,fontWeight:600,fontFamily:"inherit",fontSize:15,cursor:"pointer"}} onClick={onCancel}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Label confirm modal ───────────────────────────────────────────────────────
 function LabelConfirmModal({scanned,onConfirm,onCancel}){
   const[servings,setServings]=useState("1");   const[rawInput,setRawInput]=useState("1");
@@ -501,6 +542,7 @@ export default function FitLog(){
   const[confirmModal,setConfirmModal]=useState(null);
   const[labelModal,setLabelModal]=useState(null);
   const[saveFoodPrompt,setSaveFoodPrompt]=useState(null);   const[pendingLog,setPendingLog]=useState(null);
+  const[editFoodModal,setEditFoodModal]=useState(null);
   const bottomRef=useRef(null);
   const inputRef=useRef(null);
   const fileRef=useRef(null);
@@ -524,6 +566,7 @@ export default function FitLog(){
 
   function deleteNutritionEntry(timestamp){const updated=nutrition.filter(n=>n.timestamp!==timestamp);setNutrition(updated);save(STORAGE_KEYS.nutrition,updated);}
   function deleteNutritionItem(entryTimestamp,itemIndex){const updated=nutrition.map(n=>{if(n.timestamp!==entryTimestamp)return n;const newItems=n.items.filter((_,i)=>i!==itemIndex);return{...n,items:newItems};}).filter(n=>n.items.length>0);setNutrition(updated);save(STORAGE_KEYS.nutrition,updated);}
+  function editNutritionItem(entryTimestamp,itemIndex,updates){const updated=nutrition.map(n=>{if(n.timestamp!==entryTimestamp)return n;return{...n,items:n.items.map((it,i)=>i===itemIndex?{...it,...updates}:it)};});setNutrition(updated);save(STORAGE_KEYS.nutrition,updated);}
   function deleteWorkoutEntry(timestamp){const updated=workouts.filter(w=>w.timestamp!==timestamp);setWorkouts(updated);save(STORAGE_KEYS.workouts,updated);}
   function deleteWorkoutSet(date,exerciseName){const updated=workouts.map(w=>{if(w.date!==date)return w;const newSets=w.sets.filter(s=>{const resolved=resolveEx(s.exercise);return resolved!==exerciseName&&s.exercise.toLowerCase().trim()!==exerciseName;});return{...w,sets:newSets};}).filter(w=>w.sets.length>0);setWorkouts(updated);save(STORAGE_KEYS.workouts,updated);}
 
@@ -754,6 +797,7 @@ export default function FitLog(){
     <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:C.bg,color:C.text,height:"100svh",display:"flex",flexDirection:"column",overflow:"hidden",maxWidth:480,margin:"0 auto"}}>
       {confirmModal&&<ExerciseConfirmModal incoming={confirmModal.incoming} existing={confirmModal.existing} onSame={handleSameEx} onDifferent={handleDiffEx}/>}
       {labelModal&&<LabelConfirmModal scanned={labelModal} onConfirm={handleLabelConfirm} onCancel={()=>setLabelModal(null)}/>}
+      {editFoodModal&&<EditFoodModal item={editFoodModal.item} onSave={(updates)=>{editNutritionItem(editFoodModal.entryTimestamp,editFoodModal.itemIndex,updates);setEditFoodModal(null);}} onCancel={()=>setEditFoodModal(null)}/>}
 
       <div style={{padding:"16px 18px 12px",background:C.surface,borderBottom:`1px solid ${C.border}`,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
         <p style={{fontSize:20,fontWeight:800,color:C.text,margin:0,letterSpacing:"-0.02em"}}>⚡ FitLog</p>
@@ -824,6 +868,7 @@ export default function FitLog(){
                     <div key={ii} style={{...rowSt,gap:10}}>
                       <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:15}}>{item.quantity} {item.name}</span>
                       <span style={{color:C.amber,fontWeight:700,flexShrink:0,fontSize:15}}>{item.calories} cal</span>
+                      <button onClick={()=>setEditFoodModal({entryTimestamp:entry.timestamp,itemIndex:ii,item})} style={{background:"none",border:`1.5px solid ${C.border}`,borderRadius:8,padding:"4px 10px",color:C.mutedLight,fontSize:12,fontFamily:"inherit",cursor:"pointer",flexShrink:0,minHeight:32,whiteSpace:"nowrap"}}>✎</button>
                       <DeleteBtn onDelete={()=>deleteNutritionItem(entry.timestamp,ii)}/>
                     </div>
                   ))}
