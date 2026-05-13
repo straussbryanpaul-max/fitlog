@@ -158,6 +158,47 @@ function EditFoodModal({item,onSave,onCancel}){
   );
 }
 
+// ── Edit custom food modal ────────────────────────────────────────────────────
+function EditCustomFoodModal({food,onSave,onCancel}){
+  const[name,setName]=useState(food.name||"");
+  const[servingSize,setServingSize]=useState(food.servingSize||"1 serving");
+  const[calories,setCalories]=useState(String(food.calories??""));
+  const[protein,setProtein]=useState(String(food.protein_g??""));
+  const[carbs,setCarbs]=useState(String(food.carbs_g??""));
+  const[fat,setFat]=useState(String(food.fat_g??""));
+  const lbl={fontSize:12,color:C.muted,display:"block",marginBottom:6,fontWeight:600};
+  const field=(c)=>({...inp,padding:"10px 12px",fontSize:15,borderColor:c||C.border});
+  function handleSave(){
+    onSave({
+      name:name.trim()||food.name,
+      servingSize:servingSize.trim()||food.servingSize||"1 serving",
+      calories:Math.max(0,Math.round(parseFloat(calories)||0)),
+      protein_g:Math.max(0,Math.round(parseFloat(protein)||0)),
+      carbs_g:Math.max(0,Math.round(parseFloat(carbs)||0)),
+      fat_g:Math.max(0,Math.round(parseFloat(fat)||0)),
+    });
+  }
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,padding:24,width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:12,color:C.accent,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:14}}>Edit Saved Food</div>
+        <div style={{marginBottom:12}}><label style={lbl}>Name</label><input style={field()} value={name} onChange={e=>setName(e.target.value)}/></div>
+        <div style={{marginBottom:12}}><label style={lbl}>Serving size</label><input style={field()} value={servingSize} onChange={e=>setServingSize(e.target.value)} placeholder="e.g. 1 cup"/></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
+          <div><label style={{...lbl,color:C.amber}}>Calories</label><input style={field(C.amber)} type="number" inputMode="numeric" value={calories} onChange={e=>setCalories(e.target.value)}/></div>
+          <div><label style={{...lbl,color:C.accent}}>Protein (g)</label><input style={field(C.accent)} type="number" inputMode="numeric" value={protein} onChange={e=>setProtein(e.target.value)}/></div>
+          <div><label style={{...lbl,color:C.purple}}>Carbs (g)</label><input style={field(C.purple)} type="number" inputMode="numeric" value={carbs} onChange={e=>setCarbs(e.target.value)}/></div>
+          <div><label style={{...lbl,color:C.orange}}>Fat (g)</label><input style={field(C.orange)} type="number" inputMode="numeric" value={fat} onChange={e=>setFat(e.target.value)}/></div>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button style={{flex:1,background:C.accent,border:"none",borderRadius:12,padding:"14px 0",color:"#fff",fontWeight:700,fontFamily:"inherit",fontSize:15,cursor:"pointer"}} onClick={handleSave}>Save</button>
+          <button style={{flex:1,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"14px 0",color:C.muted,fontWeight:600,fontFamily:"inherit",fontSize:15,cursor:"pointer"}} onClick={onCancel}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Label confirm modal ───────────────────────────────────────────────────────
 function LabelConfirmModal({scanned,onConfirm,onCancel}){
   const[servings,setServings]=useState("1");   const[rawInput,setRawInput]=useState("1");
@@ -290,7 +331,7 @@ const CustomTooltip=({active,payload,label})=>{
 };
 
 // ── Foods tab ─────────────────────────────────────────────────────────────────
-function FoodsTab({customFoods,onDelete,onLog}){
+function FoodsTab({customFoods,onDelete,onLog,onEdit}){
   const[search,setSearch]=useState("");
   const foods=Object.values(customFoods);
   const filtered=search.trim()?foods.filter(f=>f.name.toLowerCase().includes(search.toLowerCase())):foods;
@@ -311,6 +352,7 @@ function FoodsTab({customFoods,onDelete,onLog}){
             <div style={{fontSize:16,fontWeight:600,color:C.text,textTransform:"capitalize",flex:1}}>{food.name}</div>
             <div style={{display:"flex",gap:8}}>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>               <input                 type="number"                 placeholder={food.servingUnit?`# ${food.servingUnit}`:"servings"}                 style={{...inp,width:90,padding:"6px 8px",fontSize:13,textAlign:"center"}}                 id={`log-amt-${food.name}`}               />               <button style={{background:C.accent,border:"none",borderRadius:8,padding:"6px 14px",color:"#fff",fontSize:13,fontWeight:700,fontFamily:"inherit",cursor:"pointer"}} onClick={()=>{const el=document.getElementById(`log-amt-${food.name}`);const val=parseFloat(el?.value)||1;const mult=food.servingUnit?val/getServingBase(food):val;onLog(food,mult);}}>Log</button>             </div>
+              <button style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 10px",color:C.mutedLight,fontSize:13,fontFamily:"inherit",cursor:"pointer"}} onClick={()=>onEdit&&onEdit(food)}>✎</button>
               <button style={{background:C.redLight,border:`1px solid ${C.red}`,borderRadius:8,padding:"6px 10px",color:C.red,fontSize:13,fontFamily:"inherit",cursor:"pointer"}} onClick={()=>onDelete(food.name)}>✕</button>
             </div>
           </div>
@@ -543,6 +585,7 @@ export default function FitLog(){
   const[labelModal,setLabelModal]=useState(null);
   const[saveFoodPrompt,setSaveFoodPrompt]=useState(null);   const[pendingLog,setPendingLog]=useState(null);
   const[editFoodModal,setEditFoodModal]=useState(null);
+  const[editCustomFoodModal,setEditCustomFoodModal]=useState(null);
   const bottomRef=useRef(null);
   const inputRef=useRef(null);
   const fileRef=useRef(null);
@@ -567,6 +610,20 @@ export default function FitLog(){
   function deleteNutritionEntry(timestamp){const updated=nutrition.filter(n=>n.timestamp!==timestamp);setNutrition(updated);save(STORAGE_KEYS.nutrition,updated);}
   function deleteNutritionItem(entryTimestamp,itemIndex){const updated=nutrition.map(n=>{if(n.timestamp!==entryTimestamp)return n;const newItems=n.items.filter((_,i)=>i!==itemIndex);return{...n,items:newItems};}).filter(n=>n.items.length>0);setNutrition(updated);save(STORAGE_KEYS.nutrition,updated);}
   function editNutritionItem(entryTimestamp,itemIndex,updates){const updated=nutrition.map(n=>{if(n.timestamp!==entryTimestamp)return n;return{...n,items:n.items.map((it,i)=>i===itemIndex?{...it,...updates}:it)};});setNutrition(updated);save(STORAGE_KEYS.nutrition,updated);}
+  function editCustomFood(originalName,updates){
+    const oldKey=originalName.toLowerCase();
+    const newKey=(updates.name||originalName).toLowerCase();
+    const existing=customFoods[oldKey]||{};
+    const merged={...existing,...updates};
+    const next={...customFoods};
+    if(newKey!==oldKey){
+      if(next[newKey]){alert(`A saved food named "${updates.name}" already exists.`);return false;}
+      delete next[oldKey];
+    }
+    next[newKey]=merged;
+    setCustomFoods(next);save(STORAGE_KEYS.customFoods,next);
+    return true;
+  }
   function deleteWorkoutEntry(timestamp){const updated=workouts.filter(w=>w.timestamp!==timestamp);setWorkouts(updated);save(STORAGE_KEYS.workouts,updated);}
   function deleteWorkoutSet(date,exerciseName){const updated=workouts.map(w=>{if(w.date!==date)return w;const newSets=w.sets.filter(s=>{const resolved=resolveEx(s.exercise);return resolved!==exerciseName&&s.exercise.toLowerCase().trim()!==exerciseName;});return{...w,sets:newSets};}).filter(w=>w.sets.length>0);setWorkouts(updated);save(STORAGE_KEYS.workouts,updated);}
 
@@ -798,6 +855,7 @@ export default function FitLog(){
       {confirmModal&&<ExerciseConfirmModal incoming={confirmModal.incoming} existing={confirmModal.existing} onSame={handleSameEx} onDifferent={handleDiffEx}/>}
       {labelModal&&<LabelConfirmModal scanned={labelModal} onConfirm={handleLabelConfirm} onCancel={()=>setLabelModal(null)}/>}
       {editFoodModal&&<EditFoodModal item={editFoodModal.item} onSave={(updates)=>{editNutritionItem(editFoodModal.entryTimestamp,editFoodModal.itemIndex,updates);setEditFoodModal(null);}} onCancel={()=>setEditFoodModal(null)}/>}
+      {editCustomFoodModal&&<EditCustomFoodModal food={editCustomFoodModal} onSave={(updates)=>{if(editCustomFood(editCustomFoodModal.name,updates)!==false)setEditCustomFoodModal(null);}} onCancel={()=>setEditCustomFoodModal(null)}/>}
 
       <div style={{padding:"16px 18px 12px",background:C.surface,borderBottom:`1px solid ${C.border}`,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
         <p style={{fontSize:20,fontWeight:800,color:C.text,margin:0,letterSpacing:"-0.02em"}}>⚡ FitLog</p>
@@ -885,6 +943,7 @@ export default function FitLog(){
         <FoodsTab
           customFoods={customFoods}
           onDelete={name=>{const u={...customFoods};delete u[name.toLowerCase()];setCustomFoods(u);save(STORAGE_KEYS.customFoods,u);}}
+          onEdit={food=>setEditCustomFoodModal(food)}
           onLog={(food,mult=1)=>{
             const entry={date:selectedDate,timestamp:Date.now(),meal:"snack",items:[{...food,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:food.servingUnit?`${Math.round(mult*(food.servingAmount||1))} ${food.servingUnit}`:`${mult} serving${mult!==1?"s":""}`}]};
             const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
