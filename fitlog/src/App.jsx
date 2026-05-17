@@ -38,9 +38,11 @@ const MUSCLE_MAP = {
   "plank":"core","crunch":"core","sit up":"core","ab rollout":"core","cable crunch":"core","leg raise":"core","ab wheel":"core","hanging knee raise":"core","russian twist":"core","abs":"core","ab":"core","hollow body":"core","dead bug":"core","mountain climber":"core","flutter kick":"core","hanging leg raise":"core","dragon flag":"core",
   // cardio
   "run":"cardio","running":"cardio","treadmill":"cardio","bike":"cardio","cycling":"cardio","elliptical":"cardio","rowing":"cardio","stairmaster":"cardio","jump rope":"cardio","hiit":"cardio","cardio":"cardio","walk":"cardio","walking":"cardio","power walk":"cardio","power walking":"cardio","swim":"cardio","swimming":"cardio","spin":"cardio","assault bike":"cardio","air bike":"cardio","rower":"cardio",
+  // kettlebell
+  "kettlebell":"kettlebell","kb":"kettlebell","kettlebell swing":"kettlebell","kb swing":"kettlebell","swing":"kettlebell","turkish get-up":"kettlebell","turkish getup":"kettlebell","tgu":"kettlebell","kettlebell snatch":"kettlebell","kb snatch":"kettlebell","kettlebell clean":"kettlebell","kb clean":"kettlebell","clean and press":"kettlebell","kettlebell press":"kettlebell","kb press":"kettlebell","kettlebell row":"kettlebell","kb row":"kettlebell","kettlebell deadlift":"kettlebell","kb deadlift":"kettlebell","windmill":"kettlebell","halo":"kettlebell","kettlebell halo":"kettlebell","figure 8":"kettlebell","kettlebell figure 8":"kettlebell","kb figure 8":"kettlebell","goblet":"kettlebell",
 };
 
-const VALID_MUSCLE_GROUPS=["chest","back","shoulders","legs","biceps","triceps","core","cardio"];
+const VALID_MUSCLE_GROUPS=["chest","back","shoulders","legs","biceps","triceps","core","cardio","kettlebell"];
 function getMuscleGroup(exercise,overrides={}){
   const lower=exercise.toLowerCase().trim();
   if(overrides[lower])return overrides[lower];
@@ -481,16 +483,6 @@ function buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap){
   return`GOALS: ${goals.calories}cal | ${goals.protein_g}g protein\nEXERCISES:\n${Object.entries(exS).map(([n,s])=>{const sorted=s.sort((a,b)=>a.date.localeCompare(b.date));const best=Math.max(...s.map(x=>x.weight));const lat=sorted[sorted.length-1];return`- ${n}: ${s.length} sessions, best=${best}lbs, latest=${lat.weight}lbs on ${lat.date}`;}).join("\n")}\nNUTRITION:\n${Object.entries(nutD).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14).map(([d,x])=>`- ${d}: ${Math.round(x.calories)}cal | ${Math.round(x.protein_g)}g pro`).join("\n")}\nBODYWEIGHT:\n${bodyweight.slice(-14).map(b=>`- ${b.date}: ${b.weight}lbs`).join("\n")||"No data"}`;
 }
 
-async function callClaudeText(userMessage,context,systemPrompt,useWebSearch=false){
-  const res=await fetch("/api/anthropic",{
-    method:"POST",
-    headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01"},
-    body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,system:systemPrompt,messages:[...context,{role:"user",content:userMessage}],...(useWebSearch?{tools:[{"type":"web_search_20250305","name":"web_search"}]}:{})})
-  });
-  const data=await res.json();
-  return data.content?.map(b=>b.text||"").join("")||"";
-}
-
 async function callClaudeImage(base64,mediaType){
   const res=await fetch("/api/anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string","servingUnit":"string","servingAmount":number}  servingUnit should be the countable unit (pieces, chips, crisps, crackers, cookies, gummies) NOT weight/volume (oz, g, ml, cup). servingAmount is how many of that unit equals one serving (e.g. if serving is 20 pieces, servingAmount=20). If no countable unit exists, use "serving" with servingAmount=1.\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
   const data=await res.json();
@@ -498,35 +490,89 @@ async function callClaudeImage(base64,mediaType){
   try{return JSON.parse(text.replace(/```json|```/g,"").trim());}catch{return null;}
 }
 
-const PARSE_SYSTEM=`You are FitLog. Parse input into JSON only. No plain text.
+const COACH_SYSTEM_STATIC=`You are FitLog, a fitness chat assistant. The user logs workouts, food, and bodyweight by talking to you naturally. You have tools to record, edit, and query their data.
 
-Workout: {"type":"workout","sets":[{"exercise":"string","sets":number,"reps":number,"weight":number,"unit":"lbs","muscleGroup":"chest|back|shoulders|legs|biceps|triceps|core|cardio|null"}]}
-If user types "category - exercise - sets" format (e.g. "chest - incline machine press - 4x10 @ 155"), extract the category as muscleGroup and the exercise name as exercise. Valid muscleGroup values: chest, back, shoulders, legs, biceps, triceps, core, cardio. Set muscleGroup to null if not specified by the user.
-reps and weight are ALWAYS optional — use 0 if not provided. Never return "unclear" just because reps or weight are missing. Examples: "lateral raises 4 sets" → sets=4, reps=0, weight=0. "shoulders - lateral raises - 4 sets" → sets=4, reps=0, weight=0, muscleGroup="shoulders".
-Nutrition with KNOWN macros (user stated cal/protein/carbs/fat): {"type":"nutrition_known","name":"food name","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string","meal":"breakfast"|"lunch"|"dinner"|"snack","servings":number}
-Nutrition lookup (user didn't state macros): {"type":"nutrition","items":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}],"meal":"breakfast"|"lunch"|"dinner"|"snack"}
-Bodyweight: {"type":"bodyweight","weight":number,"unit":"lbs"}
-Save template: {"type":"save_template","name":"string","meal":"breakfast"|"lunch"|"dinner"|"snack","items":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}
-Use template: {"type":"use_template","name":"string","servings":number}
-Use custom food: {"type":"use_custom_food","name":"string","servings":number,"amount":number,"unit":"string","meal":"breakfast"|"lunch"|"dinner"|"snack"}
-  Use amount+unit for countable items ("5 prunes" → amount:5, unit:"prunes", servings:1). servings = full serving multiplier only when user says "2 servings" etc.
-Create custom food from ingredients: {"type":"create_custom_food","name":"string","ingredients":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}
-Trend/analysis question: {"type":"query"}
-Unclear: {"type":"unclear","response":"string"}
+CORE BEHAVIOR
+- If the user's intent is clear, call the appropriate tool and write ONE concise confirmation. Don't ask before logging straightforward items.
+- For multiple actions in one message ("2 eggs and weighed 175"), call multiple tools in one turn.
+- After tools run, write a short summary including macros for food, weights/sets for workouts. Use ✅ to confirm logs.
+- NEVER claim you "logged" something without actually calling a tool. Actions only happen via tools.
 
-IMPORTANT: If user provides explicit calorie/macro numbers, use "nutrition_known" type.
-For nutrition lookups — follow this priority order:
-1. If the food appears in CUSTOM FOODS (injected below), return {"type":"use_custom_food",...} — NEVER return type "nutrition" for custom foods, even if you think you know better macros.
-2. For simple whole foods (plain chicken breast, plain rice, fresh fruit, raw vegetables) — estimate from your training knowledge.
-3. For ANY branded, packaged, restaurant, or processed food NOT in custom foods — you MUST use web_search to find accurate macros. Never guess 0 for calories. Return ONLY the JSON object even after searching.`;
+FOOD LOGGING
+- If a food fuzzy-matches an entry in CUSTOM FOODS below, use \`use_custom_food\` — never re-estimate macros for a custom food.
+- For simple whole foods (plain chicken breast, plain rice, fresh fruit, raw vegetables), estimate from training knowledge and call \`log_food\` directly.
+- For branded, packaged, restaurant, or processed items NOT in custom foods, use web_search to find accurate macros, then call \`log_food\`. Never guess 0 calories.
+- When the user provides explicit macros (e.g. "protein bar 190cal 21p 18c 6f"), use those — call \`log_food\` directly.
+- Quantity field: countable foods use piece+unit ("2 eggs", "3 slices"); otherwise servings ("1 cup", "1 serving").
 
-function buildFoodContext(customFoods) {
-  const customList = Object.values(customFoods).slice(0, 30);
-  if (!customList.length) return "";
-  return "CUSTOM FOODS:\n" + customList.map(f => {
-    const srv = f.servingUnit ? `${getServingBase(f)} ${f.servingUnit} per serving` : (f.servingSize || "1 serving");
-    return `- "${f.name}": ${f.calories}cal per serving (${srv}) | ${f.protein_g}g pro | ${f.carbs_g}g carbs | ${f.fat_g}g fat`;
-  }).join("\n");
+WORKOUT LOGGING
+- "bench 3x8 @ 185" → \`log_workout\` with exercise="bench", sets=3, reps=8, weight=185, unit="lbs".
+- "chest - incline press - 4x10 @ 155" → muscleGroup="chest", exercise="incline press", sets=4, reps=10, weight=155.
+- reps and weight are optional — use 0 if not given.
+- Valid muscleGroup values: chest, back, shoulders, legs, biceps, triceps, core, cardio, kettlebell.
+- For kettlebell-style work ("kb swing 5x10", "turkish get-up 3x3 @ 35"), use muscleGroup="kettlebell".
+
+QUESTIONS
+- For "how am I doing on protein?", "is my bench improving?", trend/summary questions — answer directly from CURRENT DATA below. No tool calls needed.
+
+EDITING & DELETING
+- Use RECENT NUTRITION ENTRIES below to find the right timestamp + item_index for \`edit_food_item\` / \`delete_food_item\`.
+- If multiple entries could match the user's request, ask which one before acting.
+
+CLARIFY ONLY WHEN GENUINELY AMBIGUOUS
+- "I had dinner" with no specifics → ask what they ate.
+- "Log my breakfast" with no specifics → ask what they ate.
+- Otherwise, act.`;
+
+const TOOLS=[
+  {name:"log_food",description:"Log one or more food items to the user's nutrition diary for the current LOGGING DATE. Use this for foods NOT in the user's custom-foods library, or when the user states explicit macros.",input_schema:{type:"object",properties:{items:{type:"array",items:{type:"object",properties:{name:{type:"string"},calories:{type:"number"},protein_g:{type:"number"},carbs_g:{type:"number"},fat_g:{type:"number"},quantity:{type:"string",description:"e.g. '1 cup', '2 slices', '1 serving', '3 eggs'"}},required:["name","calories","protein_g","carbs_g","fat_g","quantity"]}},meal:{type:"string",enum:["breakfast","lunch","dinner","snack"]}},required:["items","meal"]}},
+  {name:"use_custom_food",description:"Log a food that exists in the user's CUSTOM FOODS library. Macros come from the saved food, scaled by serving count or amount/unit. ALWAYS use this when the food matches a custom-food entry — do not call log_food for custom foods.",input_schema:{type:"object",properties:{name:{type:"string",description:"The custom food name (must fuzzy-match an entry in CUSTOM FOODS)"},meal:{type:"string",enum:["breakfast","lunch","dinner","snack"]},servings:{type:"number",description:"Number of full servings (e.g. 2 for '2 servings'). Default 1."},amount:{type:"number",description:"Numeric amount when user specifies units (e.g. 5 for '5 crisps'). Optional."},unit:{type:"string",description:"Unit when user specifies amount (e.g. 'crisps', 'pieces'). Optional."}},required:["name","meal"]}},
+  {name:"create_custom_food",description:"Save a NEW custom food (built from listed ingredients) to the user's CUSTOM FOODS library. Use this when the user explicitly asks to save/define a new food made from ingredients (e.g. 'save my smoothie: ...').",input_schema:{type:"object",properties:{name:{type:"string"},ingredients:{type:"array",items:{type:"object",properties:{name:{type:"string"},calories:{type:"number"},protein_g:{type:"number"},carbs_g:{type:"number"},fat_g:{type:"number"},quantity:{type:"string"}},required:["name","calories","protein_g","carbs_g","fat_g","quantity"]}}},required:["name","ingredients"]}},
+  {name:"log_workout",description:"Log workout sets to the current LOGGING DATE. Each entry is one exercise with set count, reps, weight.",input_schema:{type:"object",properties:{sets:{type:"array",items:{type:"object",properties:{exercise:{type:"string"},sets:{type:"number"},reps:{type:"number",description:"0 if not specified"},weight:{type:"number",description:"0 if not specified"},unit:{type:"string",enum:["lbs","kg"]},muscleGroup:{type:"string",enum:["chest","back","shoulders","legs","biceps","triceps","core","cardio","kettlebell"]}},required:["exercise","sets"]}}},required:["sets"]}},
+  {name:"log_bodyweight",description:"Log the user's bodyweight in lbs for today.",input_schema:{type:"object",properties:{weight:{type:"number"}},required:["weight"]}},
+  {name:"save_template",description:"Save a named meal template (a bundle of foods) for later reuse via use_template.",input_schema:{type:"object",properties:{name:{type:"string"},meal:{type:"string",enum:["breakfast","lunch","dinner","snack"]},items:{type:"array",items:{type:"object",properties:{name:{type:"string"},calories:{type:"number"},protein_g:{type:"number"},carbs_g:{type:"number"},fat_g:{type:"number"},quantity:{type:"string"}},required:["name","calories","protein_g","carbs_g","fat_g","quantity"]}}},required:["name","meal","items"]}},
+  {name:"use_template",description:"Log a previously saved meal template, optionally scaled by servings.",input_schema:{type:"object",properties:{name:{type:"string"},servings:{type:"number",description:"Default 1"}},required:["name"]}},
+  {name:"edit_food_item",description:"Edit a previously logged food item. Find the right entry via RECENT NUTRITION ENTRIES (timestamp + item_index).",input_schema:{type:"object",properties:{timestamp:{type:"number",description:"The entry timestamp shown in RECENT NUTRITION ENTRIES"},item_index:{type:"number"},updates:{type:"object",properties:{name:{type:"string"},quantity:{type:"string"},calories:{type:"number"},protein_g:{type:"number"},carbs_g:{type:"number"},fat_g:{type:"number"}}}},required:["timestamp","item_index","updates"]}},
+  {name:"delete_food_item",description:"Delete a previously logged food item by timestamp + item_index.",input_schema:{type:"object",properties:{timestamp:{type:"number"},item_index:{type:"number"}},required:["timestamp","item_index"]}},
+  {name:"set_goals",description:"Update the user's daily nutrition goals.",input_schema:{type:"object",properties:{calories:{type:"number"},protein_g:{type:"number"},carb_fat_split:{type:"number",description:"% of remaining calories from carbs (rest is fat). E.g. 60 = 60% carbs, 40% fat."}}}}
+];
+
+function buildDynamicContext({customFoods,workouts,nutrition,bodyweight,goals,exerciseMap,selectedDate}){
+  const customList=Object.values(customFoods).slice(0,30);
+  const customFoodsBlock=customList.length
+    ?customList.map(f=>{
+        const srv=f.servingUnit?`${getServingBase(f)} ${f.servingUnit} per serving`:(f.servingSize||"1 serving");
+        return `- "${f.name}": ${f.calories}cal per serving (${srv}) | ${f.protein_g}g pro | ${f.carbs_g}g carbs | ${f.fat_g}g fat`;
+      }).join("\n")
+    :"(none yet)";
+  const recentEntries=nutrition.slice(-15).map(n=>
+    `- ${n.date} ${n.meal} ts=${n.timestamp}: ${n.items.map((i,idx)=>`[${idx}] ${i.quantity} ${i.name} ${i.calories}cal`).join("; ")}`
+  ).join("\n")||"(none yet)";
+  return `CUSTOM FOODS:\n${customFoodsBlock}\n\nCURRENT DATA:\n${buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap)}\n\nRECENT NUTRITION ENTRIES (for edit/delete reference):\n${recentEntries}\n\nLOGGING DATE: ${selectedDate}\nTODAY: ${today()}`;
+}
+
+async function callClaudeAgent(messages,dynamicContext){
+  const lastIdx=TOOLS.length-1;
+  const tools=[
+    {type:"web_search_20250305",name:"web_search"},
+    ...TOOLS.slice(0,lastIdx),
+    {...TOOLS[lastIdx],cache_control:{type:"ephemeral"}}
+  ];
+  const res=await fetch("/api/anthropic",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01"},
+    body:JSON.stringify({
+      model:"claude-sonnet-4-5",
+      max_tokens:1500,
+      system:[
+        {type:"text",text:COACH_SYSTEM_STATIC,cache_control:{type:"ephemeral"}},
+        {type:"text",text:dynamicContext}
+      ],
+      tools,
+      messages
+    })
+  });
+  return await res.json();
 }
 
 // Returns how many units constitute one "serving" for a custom food.
@@ -583,12 +629,13 @@ export default function FitLog(){
   const[savedFlash,setSavedFlash]=useState(false);   const[weekOffset,setWeekOffset]=useState(0);
   const[confirmModal,setConfirmModal]=useState(null);
   const[labelModal,setLabelModal]=useState(null);
-  const[saveFoodPrompt,setSaveFoodPrompt]=useState(null);   const[pendingLog,setPendingLog]=useState(null);
+  const[saveFoodPrompt,setSaveFoodPrompt]=useState(null);
   const[editFoodModal,setEditFoodModal]=useState(null);
   const[editCustomFoodModal,setEditCustomFoodModal]=useState(null);
   const bottomRef=useRef(null);
   const inputRef=useRef(null);
   const fileRef=useRef(null);
+  const stateRef=useRef({workouts:[],nutrition:[],bodyweight:[],customFoods:{},templates:{},goals:DEFAULT_GOALS,exerciseMap:{},muscleOverrides:{}});
 
   useEffect(()=>{
     setWorkouts(load(STORAGE_KEYS.workouts,[]));     setWeeklySets(load(STORAGE_KEYS.weeklysets,{}));
@@ -603,6 +650,10 @@ export default function FitLog(){
   },[]);
 
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[messages]);
+
+  useEffect(()=>{
+    stateRef.current={workouts,nutrition,bodyweight,customFoods,templates,goals,exerciseMap,muscleOverrides};
+  },[workouts,nutrition,bodyweight,customFoods,templates,goals,exerciseMap,muscleOverrides]);
 
   function resolveEx(raw,map=exerciseMap){const l=raw.toLowerCase().trim();return map[l]||HARD_ALIASES[l]||l;}
   function getKnownExercises(map=exerciseMap){const s=new Set();workouts.forEach(w=>w.sets.forEach(x=>s.add(resolveEx(x.exercise,map))));return[...s];}
@@ -695,143 +746,247 @@ export default function FitLog(){
   const doLogBW=val=>{const n=parseFloat(val);if(isNaN(n)||n<50||n>500)return null;const entry={date:today(),weight:n,unit:"lbs",timestamp:Date.now()};const updated=[...bodyweight.filter(b=>b.date!==today()),entry].sort((a,b)=>a.date.localeCompare(b.date));setBW(updated);save(STORAGE_KEYS.bodyweight,updated);return n;};
   const saveGoals=()=>{const c=Math.max(0,parseInt(draftCals)||0),p=Math.max(0,parseInt(draftPro)||0),d=calcMacros(c,p,draftSplit),g={calories:c,protein_g:p,carbs_g:d.carbs_g,fat_g:d.fat_g,carbFatSplit:draftSplit};setGoals(g);save(STORAGE_KEYS.goals,g);setSavedFlash(true);setTimeout(()=>setSavedFlash(false),1800);};
 
+  function dispatchTool(name,input){
+    const cur=stateRef.current;
+    try{
+      switch(name){
+        case"log_food":{
+          const meal=input.meal||"snack";
+          const items=(input.items||[]).map(it=>({
+            name:it.name,
+            calories:Math.round(it.calories||0),
+            protein_g:Math.round(it.protein_g||0),
+            carbs_g:Math.round(it.carbs_g||0),
+            fat_g:Math.round(it.fat_g||0),
+            quantity:it.quantity||"1 serving",
+          }));
+          if(!items.length)return{error:"No items provided"};
+          const entry={date:selectedDate,timestamp:Date.now(),meal,items};
+          const updated=[...cur.nutrition,entry];
+          stateRef.current={...cur,nutrition:updated};
+          setNutrition(updated);save(STORAGE_KEYS.nutrition,updated);
+          if(!cur.customFoods[items[0].name.toLowerCase()]){
+            setSaveFoodPrompt({food:items[0],meal});
+          }
+          return{ok:true,timestamp:entry.timestamp,logged:items.map(i=>`${i.quantity} ${i.name} (${i.calories}cal)`)};
+        }
+        case"use_custom_food":{
+          const key=(input.name||"").toLowerCase();
+          const customFoods=cur.customFoods;
+          const bestMatch=Object.keys(customFoods).reduce((best,k)=>{const score=fuzzyFoodMatch(key,k);return score>best.score?{key:k,score}:best;},{key:null,score:0.45});
+          if(!bestMatch.key)return{error:`No custom food matching "${input.name}". Available: ${Object.keys(customFoods).join(", ")||"(none)"}`};
+          const food=customFoods[bestMatch.key];
+          let mult=input.servings||1;
+          if(input.amount&&input.unit){
+            if(food.servingUnit&&input.unit.toLowerCase().includes(food.servingUnit.toLowerCase())){
+              mult=input.amount/getServingBase(food);
+            }else if(!food.servingUnit&&food.servingSize){
+              const sRe=new RegExp(`(\\d+\\.?\\d*)\\s*${input.unit}s?`,'i');
+              const sm=food.servingSize.match(sRe);
+              if(sm){const base=parseFloat(sm[1]);if(base>0)mult=input.amount/base;}
+            }
+          }
+          const item={
+            name:food.name,
+            calories:Math.round(food.calories*mult),
+            protein_g:Math.round(food.protein_g*mult),
+            carbs_g:Math.round(food.carbs_g*mult),
+            fat_g:Math.round(food.fat_g*mult),
+            quantity:input.amount&&input.unit?`${input.amount} ${input.unit}`:`${mult} serving${mult!==1?"s":""}`,
+          };
+          const meal=input.meal||"snack";
+          const entry={date:selectedDate,timestamp:Date.now(),meal,items:[item]};
+          const updated=[...cur.nutrition,entry];
+          stateRef.current={...cur,nutrition:updated};
+          setNutrition(updated);save(STORAGE_KEYS.nutrition,updated);
+          return{ok:true,timestamp:entry.timestamp,logged:`${item.quantity} ${item.name} (${item.calories}cal)`};
+        }
+        case"create_custom_food":{
+          const ingredients=input.ingredients||[];
+          const totals=ingredients.reduce((a,i)=>({calories:a.calories+(i.calories||0),protein_g:a.protein_g+(i.protein_g||0),carbs_g:a.carbs_g+(i.carbs_g||0),fat_g:a.fat_g+(i.fat_g||0)}),{calories:0,protein_g:0,carbs_g:0,fat_g:0});
+          const food={name:input.name,calories:Math.round(totals.calories),protein_g:Math.round(totals.protein_g),carbs_g:Math.round(totals.carbs_g),fat_g:Math.round(totals.fat_g),servingSize:"1 serving",servingUnit:null,servingAmount:1};
+          const k=input.name.toLowerCase();
+          const updated={...cur.customFoods,[k]:food};
+          stateRef.current={...cur,customFoods:updated};
+          setCustomFoods(updated);save(STORAGE_KEYS.customFoods,updated);
+          return{ok:true,name:food.name,totals:{calories:food.calories,protein_g:food.protein_g,carbs_g:food.carbs_g,fat_g:food.fat_g}};
+        }
+        case"log_workout":{
+          const sets=input.sets||[];
+          if(!sets.length)return{error:"No sets provided"};
+          processExQueue(sets,[],cur.exerciseMap);
+          return{ok:true,sets_queued:sets.length,note:"App will display the workout confirmation directly. You do NOT need to write a further confirmation."};
+        }
+        case"log_bodyweight":{
+          const val=doLogBW(String(input.weight));
+          if(!val)return{error:"Weight value out of range (50-500 lbs)"};
+          return{ok:true,weight:val};
+        }
+        case"save_template":{
+          const tname=(input.name||"unnamed").toLowerCase();
+          const updated={...cur.templates,[tname]:{name:tname,meal:input.meal,items:input.items}};
+          stateRef.current={...cur,templates:updated};
+          setTemplates(updated);save(STORAGE_KEYS.templates,updated);
+          return{ok:true,name:tname};
+        }
+        case"use_template":{
+          const tname=(input.name||"").toLowerCase();
+          const match=Object.keys(cur.templates).find(k=>tname.includes(k)||k.includes(tname));
+          if(!match)return{error:Object.keys(cur.templates).length?`No template "${input.name}". Saved: ${Object.keys(cur.templates).join(", ")}`:"No templates saved yet."};
+          const tmpl=cur.templates[match];
+          const mult=input.servings||1;
+          const items=tmpl.items.map(i=>({...i,calories:Math.round(i.calories*mult),protein_g:Math.round(i.protein_g*mult),carbs_g:Math.round(i.carbs_g*mult),fat_g:Math.round(i.fat_g*mult)}));
+          const entry={date:selectedDate,timestamp:Date.now(),meal:tmpl.meal,items};
+          const updated=[...cur.nutrition,entry];
+          stateRef.current={...cur,nutrition:updated};
+          setNutrition(updated);save(STORAGE_KEYS.nutrition,updated);
+          const tot=items.reduce((a,i)=>({cal:a.cal+(i.calories||0),p:a.p+(i.protein_g||0)}),{cal:0,p:0});
+          return{ok:true,name:match,timestamp:entry.timestamp,totals:{calories:tot.cal,protein_g:Math.round(tot.p)}};
+        }
+        case"edit_food_item":{
+          const entry=cur.nutrition.find(n=>n.timestamp===input.timestamp);
+          if(!entry)return{error:"No nutrition entry with that timestamp"};
+          if(input.item_index>=entry.items.length||input.item_index<0)return{error:"item_index out of range"};
+          const u=input.updates||{};
+          const cleanUpdates={};
+          if(u.name!==undefined)cleanUpdates.name=u.name;
+          if(u.quantity!==undefined)cleanUpdates.quantity=u.quantity;
+          if(u.calories!==undefined)cleanUpdates.calories=Math.max(0,Math.round(u.calories));
+          if(u.protein_g!==undefined)cleanUpdates.protein_g=Math.max(0,Math.round(u.protein_g));
+          if(u.carbs_g!==undefined)cleanUpdates.carbs_g=Math.max(0,Math.round(u.carbs_g));
+          if(u.fat_g!==undefined)cleanUpdates.fat_g=Math.max(0,Math.round(u.fat_g));
+          const newNutrition=cur.nutrition.map(n=>{
+            if(n.timestamp!==input.timestamp)return n;
+            return{...n,items:n.items.map((it,i)=>i===input.item_index?{...it,...cleanUpdates}:it)};
+          });
+          stateRef.current={...cur,nutrition:newNutrition};
+          setNutrition(newNutrition);save(STORAGE_KEYS.nutrition,newNutrition);
+          return{ok:true,updated:cleanUpdates};
+        }
+        case"delete_food_item":{
+          const entry=cur.nutrition.find(n=>n.timestamp===input.timestamp);
+          if(!entry)return{error:"No nutrition entry with that timestamp"};
+          const newNutrition=cur.nutrition.map(n=>{
+            if(n.timestamp!==input.timestamp)return n;
+            return{...n,items:n.items.filter((_,i)=>i!==input.item_index)};
+          }).filter(n=>n.items.length>0);
+          stateRef.current={...cur,nutrition:newNutrition};
+          setNutrition(newNutrition);save(STORAGE_KEYS.nutrition,newNutrition);
+          return{ok:true};
+        }
+        case"set_goals":{
+          const newGoals={...cur.goals};
+          if(input.calories!==undefined)newGoals.calories=Math.max(0,Math.round(input.calories));
+          if(input.protein_g!==undefined)newGoals.protein_g=Math.max(0,Math.round(input.protein_g));
+          if(input.carb_fat_split!==undefined)newGoals.carbFatSplit=Math.max(0,Math.min(100,input.carb_fat_split));
+          const macros=calcMacros(newGoals.calories,newGoals.protein_g,newGoals.carbFatSplit);
+          newGoals.carbs_g=macros.carbs_g;newGoals.fat_g=macros.fat_g;
+          stateRef.current={...cur,goals:newGoals};
+          setGoals(newGoals);save(STORAGE_KEYS.goals,newGoals);
+          setDraftCals(String(newGoals.calories));
+          setDraftPro(String(newGoals.protein_g));
+          setDraftSplit(newGoals.carbFatSplit);
+          return{ok:true,goals:newGoals};
+        }
+        default:
+          return{error:`Unknown tool: ${name}`};
+      }
+    }catch(e){
+      return{error:e?.message||"Tool execution failed"};
+    }
+  }
+
+  function inferBubbleType(toolsFired){
+    if(toolsFired.includes("log_workout"))return"workout";
+    if(toolsFired.some(t=>["log_food","use_custom_food","use_template","edit_food_item","delete_food_item"].includes(t)))return"nutrition";
+    if(toolsFired.includes("log_bodyweight"))return"bodyweight";
+    return"info";
+  }
+
+  function capContext(msgs,target=24){
+    if(msgs.length<=target)return msgs;
+    for(let i=msgs.length-target;i>=0;i--){
+      const m=msgs[i];
+      if(m.role==="user"&&typeof m.content==="string")return msgs.slice(i);
+    }
+    return msgs;
+  }
+
+  async function runAgentTurn(userText){
+    const userMessage={role:"user",content:userText};
+    let convo=[...context,userMessage];
+    const dynamicCtx=buildDynamicContext({
+      customFoods:stateRef.current.customFoods,
+      workouts:stateRef.current.workouts,
+      nutrition:stateRef.current.nutrition,
+      bodyweight:stateRef.current.bodyweight,
+      goals:stateRef.current.goals,
+      exerciseMap:stateRef.current.exerciseMap,
+      selectedDate,
+    });
+    const toolsFired=[];
+    const MAX_STEPS=6;
+    for(let step=0;step<MAX_STEPS;step++){
+      let res;
+      try{
+        res=await callClaudeAgent(convo,dynamicCtx);
+      }catch{
+        setMessages(prev=>[...prev,{role:"assistant",content:"Network error — try again.",type:"error"}]);
+        return;
+      }
+      if(res?.type==="error"||res?.error){
+        const errMsg=res?.error?.message||res?.error||"API error";
+        setMessages(prev=>[...prev,{role:"assistant",content:`API error: ${errMsg}`,type:"error"}]);
+        return;
+      }
+      const assistantBlocks=res.content||[];
+      const textBlocks=assistantBlocks.filter(b=>b.type==="text").map(b=>b.text).filter(t=>t&&t.trim());
+      const toolUses=assistantBlocks.filter(b=>b.type==="tool_use");
+      convo=[...convo,{role:"assistant",content:assistantBlocks}];
+      if(toolUses.length===0){
+        const text=textBlocks.join("\n\n").trim();
+        if(text){
+          const type=inferBubbleType(toolsFired);
+          setMessages(prev=>[...prev,{role:"assistant",content:text,type}]);
+        }
+        setContext(capContext(convo));
+        return;
+      }
+      if(textBlocks.length){
+        const type=inferBubbleType(toolsFired);
+        textBlocks.forEach(t=>setMessages(prev=>[...prev,{role:"assistant",content:t,type}]));
+      }
+      const toolResults=[];
+      for(const tu of toolUses){
+        if(tu.name==="web_search")continue;
+        toolsFired.push(tu.name);
+        const result=dispatchTool(tu.name,tu.input);
+        toolResults.push({
+          type:"tool_result",
+          tool_use_id:tu.id,
+          content:JSON.stringify(result),
+          ...(result&&result.error?{is_error:true}:{}),
+        });
+      }
+      if(toolResults.length===0)continue;
+      convo=[...convo,{role:"user",content:toolResults}];
+    }
+    setMessages(prev=>[...prev,{role:"assistant",content:"I got stuck — try rephrasing?",type:"error"}]);
+    setContext(capContext(convo));
+  }
+
   const handleSend=async()=>{
     if(!input.trim()||loading)return;
     const userMsg=input.trim();setInput("");
     setMessages(prev=>[...prev,{role:"user",content:userMsg}]);
     setLoading(true);
     try{
-      if(pendingLog&&/^(yes|y|yep|yup|correct|log it|looks good|log|right|ok|sure)$/i.test(userMsg.trim())){const now=Date.now();const newEntries=pendingLog.items.map((item,idx)=>({date:selectedDate,timestamp:now+idx,meal:pendingLog.meal,items:[item]}));const updatedNutrition=[...nutrition,...newEntries];setNutrition(updatedNutrition);save(STORAGE_KEYS.nutrition,updatedNutrition);pendingLog.items.forEach((item,idx)=>{const reply=`✅ ${pendingLog.meal.charAt(0).toUpperCase()+pendingLog.meal.slice(1)} logged!\n  • ${item.quantity} ${item.name}: ${item.calories} cal\n${item.protein_g}g protein · ${item.carbs_g}g carbs · ${item.fat_g}g fat`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);if(idx===0&&!customFoods[item.name.toLowerCase()]){setSaveFoodPrompt({food:item,meal:pendingLog.meal});}});setPendingLog(null);setLoading(false);return;}
-      if(pendingLog&&/^(no|nope|wrong|incorrect|cancel)$/i.test(userMsg.trim())){setPendingLog(null);setMessages(prev=>[...prev,{role:"assistant",content:"No problem, what should I correct?",type:"info"}]);setLoading(false);return;}
-      const foodCtx=buildFoodContext(customFoods);
-      const fullParseSystem=PARSE_SYSTEM+(foodCtx?"\n\n"+foodCtx:"");
-      const text=await callClaudeText(userMsg,context,fullParseSystem,true);
-      let parsed;
-      try{parsed=JSON.parse(text.replace(/```json|```/g,"").trim());}
-      catch{parsed={type:"unclear",response:""};}
-
-      const nc=[...context,{role:"user",content:userMsg}];
-      let reply="";
-
-      if(parsed.type==="query"){
-        const ans=await callClaudeText(userMsg,context,`You are FitLog, a personal fitness coach. Answer using the user's real data — specific numbers and dates. Concise plain text only.\n\n${buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap)}`, true);
-        reply=ans||"Not enough data yet.";
-        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
-
-      }else if(parsed.type==="workout"){
-        if(!parsed.sets?.length){
-          reply="I couldn't parse any exercises from that. Try: \"bench 3x8 @ 185\" or \"chest - bench press - 3x8 @ 185\"";
-          setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);
-        }else{
-          processExQueue(parsed.sets,[],exerciseMap);
-          reply="Workout processed."; // commitWorkout appends the real ✅ message
-        }
-
-      }else if(parsed.type==="nutrition_known"){
-        const item={name:parsed.name,calories:Math.round(parsed.calories*(parsed.servings||1)),protein_g:Math.round(parsed.protein_g*(parsed.servings||1)),carbs_g:Math.round(parsed.carbs_g*(parsed.servings||1)),fat_g:Math.round(parsed.fat_g*(parsed.servings||1)),quantity:`${parsed.servings||1} serving${(parsed.servings||1)!==1?"s":""}`};
-        logFoodItem(item,parsed.meal||"snack",true);reply=`logged ${item.name}`;
-
-      }else if(parsed.type==="nutrition"){
-       // Client-side override: if any item matches a custom food, use custom food macros
-       // (Claude sometimes web-searches and ignores the custom food instruction)
-       parsed.items=parsed.items.map(item=>{
-         const k=item.name.toLowerCase().trim();
-         const cfKey=Object.keys(customFoods).find(ck=>fuzzyFoodMatch(k,ck)>0.65);
-         if(!cfKey)return item;
-         const cf=customFoods[cfKey];
-         let mult=1;
-         if(cf.servingUnit&&item.quantity){
-           const base=getServingBase(cf);
-           const unitRe=new RegExp(`(\\d+\\.?\\d*)\\s*${cf.servingUnit}s?`,'i');
-           const m=item.quantity.match(unitRe);
-           if(m&&base>0)mult=parseFloat(m[1])/base;
-         }
-         return{...item,name:cf.name,calories:Math.round(cf.calories*mult),protein_g:Math.round(cf.protein_g*mult),carbs_g:Math.round(cf.carbs_g*mult),fat_g:Math.round(cf.fat_g*mult)};
-       });
-       // If any item has 0 calories, do a targeted web-search retry for those items
-       const zeroItems=parsed.items.filter(i=>i.calories===0);
-       if(zeroItems.length>0){
-         try{
-           const lookupQ=zeroItems.map(i=>`${i.quantity} ${i.name}`).join(", ");
-           const lookupSys=`You are a nutrition lookup assistant. Use web search to find accurate macros for the given foods. Return ONLY valid JSON: {"items":[{"name":"string","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"quantity":"string"}]}. No markdown, no preamble.`;
-           const lookupText=await callClaudeText(`Find accurate nutrition macros for: ${lookupQ}`,[],lookupSys,true);
-           const lookupParsed=JSON.parse(lookupText.replace(/```json|```/g,"").trim());
-           if(lookupParsed.items){
-             const lookupMap=Object.fromEntries(lookupParsed.items.map(i=>[i.name.toLowerCase(),i]));
-             parsed.items=parsed.items.map(i=>{
-               if(i.calories>0)return i;
-               const lk=Object.keys(lookupMap).find(k=>fuzzyFoodMatch(i.name,k)>0.5);
-               return lk?{...i,...lookupMap[lk],quantity:i.quantity||lookupMap[lk].quantity}:i;
-             });
-           }
-         }catch{}
-       }
-       setPendingLog({items:parsed.items,meal:parsed.meal});const preview=parsed.items.map(i=>`\u2022 ${i.quantity} ${i.name}: ${i.calories} cal | ${i.protein_g}g protein | ${i.carbs_g}g carbs | ${i.fat_g}g fat`).join("\n");reply=`${preview}\n\nLog this?`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
-
-      }else if(parsed.type==="use_custom_food"){
-        const key=(parsed.name||"").toLowerCase();
-        const bestMatch=Object.keys(customFoods).reduce((best,k)=>{const score=fuzzyFoodMatch(key,k);return score>best.score?{key:k,score}:best;},{key:null,score:0.45});
-        const match=bestMatch.key;
-        if(match){const food=customFoods[match];let mult=parsed.servings||1;
-          if(parsed.amount&&parsed.unit){
-            if(food.servingUnit&&parsed.unit.toLowerCase().includes(food.servingUnit.toLowerCase())){
-              mult=parsed.amount/getServingBase(food);
-            }else if(!food.servingUnit&&food.servingSize){
-              const sRe=new RegExp(`(\\d+\\.?\\d*)\\s*${parsed.unit}s?`,'i');
-              const sm=food.servingSize.match(sRe);
-              if(sm){const base=parseFloat(sm[1]);if(base>0)mult=parsed.amount/base;}
-            }
-          }
-          const item={name:food.name,calories:Math.round(food.calories*mult),protein_g:Math.round(food.protein_g*mult),carbs_g:Math.round(food.carbs_g*mult),fat_g:Math.round(food.fat_g*mult),quantity:parsed.amount&&parsed.unit?`${parsed.amount} ${parsed.unit}`:`${mult} serving${mult!==1?"s":""}`};logFoodItem(item,parsed.meal||"snack",false);reply=`logged ${item.name}`;}
-        else{reply=`I don't have "${parsed.name}" in your Foods library yet.`;setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);}
-      }else if(parsed.type==="create_custom_food"){
-        const totals=parsed.ingredients.reduce((a,i)=>({calories:a.calories+(i.calories||0),protein_g:a.protein_g+(i.protein_g||0),carbs_g:a.carbs_g+(i.carbs_g||0),fat_g:a.fat_g+(i.fat_g||0)}),{calories:0,protein_g:0,carbs_g:0,fat_g:0});
-        const food={name:parsed.name,calories:Math.round(totals.calories),protein_g:Math.round(totals.protein_g),carbs_g:Math.round(totals.carbs_g),fat_g:Math.round(totals.fat_g),servingSize:"1 serving",servingUnit:null,servingAmount:1};
-        const key=parsed.name.toLowerCase();
-        const updated={...customFoods,[key]:food};
-        setCustomFoods(updated);save(STORAGE_KEYS.customFoods,updated);
-        reply=`📌 "${parsed.name}" saved!\n${parsed.ingredients.map(i=>`  • ${i.quantity} ${i.name}`).join("\n")}\n\nTotal: ${food.calories} cal | ${food.protein_g}g protein | ${food.carbs_g}g carbs | ${food.fat_g}g fat`;
-        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
-      }else if(parsed.type==="bodyweight"){
-        const val=doLogBW(String(parsed.weight));
-        reply=val?`⚖️ Bodyweight logged: ${val} lbs`:"That weight didn't look right.";
-        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"bodyweight"}]);
-
-      }else if(parsed.type==="save_template"){
-        const tname=(parsed.name||"unnamed").toLowerCase();
-        const updated={...templates,[tname]:{name:tname,meal:parsed.meal,items:parsed.items}};
-        setTemplates(updated);save(STORAGE_KEYS.templates,updated);
-        const t=parsed.items.reduce((a,i)=>({cal:a.cal+(i.calories||0),p:a.p+(i.protein_g||0)}),{cal:0,p:0});
-        reply=`📌 Saved as "${tname}"\n${parsed.items.map(i=>`  • ${i.quantity} ${i.name}`).join("\n")}\n${t.cal} cal | ${Math.round(t.p)}g protein`;
-        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
-
-      }else if(parsed.type==="use_template"){
-        const tname=(parsed.name||"").toLowerCase();
-        const match=Object.keys(templates).find(k=>tname.includes(k)||k.includes(tname));
-        if(match){
-          const tmpl=templates[match];const mult=parsed.servings||1;
-          const items=tmpl.items.map(i=>({...i,calories:Math.round(i.calories*mult),protein_g:Math.round(i.protein_g*mult),carbs_g:Math.round(i.carbs_g*mult),fat_g:Math.round(i.fat_g*mult)}));
-          const entry={date:selectedDate,timestamp:Date.now(),meal:tmpl.meal,items};
-          const u=[...nutrition,entry];setNutrition(u);save(STORAGE_KEYS.nutrition,u);
-          const t=items.reduce((a,i)=>({cal:a.cal+(i.calories||0),p:a.p+(i.protein_g||0)}),{cal:0,p:0});
-          reply=`✅ "${match}" logged!\n${items.map(i=>`  • ${i.quantity} ${i.name}: ${i.calories} cal`).join("\n")}\n\n${t.cal} cal | ${t.p}g protein`;
-          setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"nutrition"}]);
-        }else{
-          reply=Object.keys(templates).length?`No template called "${parsed.name}". Saved: ${Object.keys(templates).join(", ")}`:"No templates saved yet.";
-          setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"unclear"}]);
-        }
-
-     
-        
-      }else{
-        const ans=await callClaudeText(userMsg,context,`You are FitLog, a friendly fitness assistant. You help users log workouts, food, and bodyweight. You can also answer general fitness, nutrition, and health questions conversationally. Keep responses concise and helpful.\n\n${buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap)}`, true);
-        reply=ans||"Sorry, something went wrong.";
-        setMessages(prev=>[...prev,{role:"assistant",content:reply,type:"info"}]);
-      }
-
-      nc.push({role:"assistant",content:reply});setContext(nc.slice(-10));
-    }catch(e){setMessages(prev=>[...prev,{role:"assistant",content:"Something went wrong, try again.",type:"error"}]);}
-    setLoading(false);inputRef.current?.focus();
+      await runAgentTurn(userMsg);
+    }catch(e){
+      setMessages(prev=>[...prev,{role:"assistant",content:"Something went wrong, try again.",type:"error"}]);
+    }
+    setLoading(false);
+    inputRef.current?.focus();
   };
 
   const days=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i)-(weekOffset*7));return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;});
