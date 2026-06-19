@@ -20,7 +20,29 @@ const last7Days = () => { const d=[]; for(let i=6;i>=0;i--){const x=new Date();x
 const shortDate = iso => { const dt=new Date(iso+"T12:00:00"); return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][dt.getMonth()]} ${dt.getDate()}`; };
 function calcMacros(calories,protein_g,carbPct){const rem=Math.max(0,calories-protein_g*4);return{carbs_g:Math.round(rem*(carbPct/100)/4),fat_g:Math.round(rem*((100-carbPct)/100)/9)};}
 function load(key,fb){try{return JSON.parse(localStorage.getItem(key))??fb;}catch{return fb;}}
-function save(key,data){localStorage.setItem(key,JSON.stringify(data));}
+function save(key,data){localStorage.setItem(key,JSON.stringify(data));scheduleBinSync();}
+
+const JSONBIN_ID=import.meta.env.VITE_JSONBIN_ID;
+const JSONBIN_KEY=import.meta.env.VITE_JSONBIN_KEY;
+let _syncTimer=null;
+function scheduleBinSync(){
+  if(!JSONBIN_ID||!JSONBIN_KEY)return;
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(()=>{
+    const payload={};
+    for(const[,v]of Object.entries(STORAGE_KEYS)){try{const d=localStorage.getItem(v);if(d)payload[v]=JSON.parse(d);}catch{}}
+    fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":JSONBIN_KEY},body:JSON.stringify(payload)}).catch(()=>{});
+  },2000);
+}
+async function loadFromBin(){
+  if(!JSONBIN_ID||!JSONBIN_KEY)return null;
+  try{
+    const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`,{headers:{"X-Master-Key":JSONBIN_KEY}});
+    if(!r.ok)return null;
+    const j=await r.json();
+    return j.record||null;
+  }catch{return null;}
+}
 const MUSCLE_MAP = {
   // chest
   "bench press":"chest","incline bench press":"chest","decline bench press":"chest","chest press":"chest","push up":"chest","pushup":"chest","push-up":"chest","dip":"chest","cable fly":"chest","pec deck":"chest","fly":"chest","chest":"chest","bench":"chest","pec":"chest","cable crossover":"chest","crossover":"chest","pullover":"chest","incline fly":"chest","decline fly":"chest","dumbbell fly":"chest",
@@ -638,15 +660,24 @@ export default function FitLog(){
   const stateRef=useRef({workouts:[],nutrition:[],bodyweight:[],customFoods:{},templates:{},goals:DEFAULT_GOALS,exerciseMap:{},muscleOverrides:{}});
 
   useEffect(()=>{
-    setWorkouts(load(STORAGE_KEYS.workouts,[]));     setWeeklySets(load(STORAGE_KEYS.weeklysets,{}));
-    setNutrition(load(STORAGE_KEYS.nutrition,[]));
-    setBW(load(STORAGE_KEYS.bodyweight,[]));
-    setTemplates(load(STORAGE_KEYS.templates,{}));
-    setExerciseMap(load(STORAGE_KEYS.exerciseMap,{}));
-    setMuscleOverrides(load(STORAGE_KEYS.muscleOverrides,{}));
-    setCustomFoods(load(STORAGE_KEYS.customFoods,{}));
-    const g=load(STORAGE_KEYS.goals,DEFAULT_GOALS);
-    setGoals(g);setDraftCals(String(g.calories));setDraftPro(String(g.protein_g));setDraftSplit(g.carbFatSplit??60);
+    function applyData(src){
+      const g=v=>src?.[v];
+      setWorkouts(g(STORAGE_KEYS.workouts)??load(STORAGE_KEYS.workouts,[]));
+      setWeeklySets(g(STORAGE_KEYS.weeklysets)??load(STORAGE_KEYS.weeklysets,{}));
+      setNutrition(g(STORAGE_KEYS.nutrition)??load(STORAGE_KEYS.nutrition,[]));
+      setBW(g(STORAGE_KEYS.bodyweight)??load(STORAGE_KEYS.bodyweight,[]));
+      setTemplates(g(STORAGE_KEYS.templates)??load(STORAGE_KEYS.templates,{}));
+      setExerciseMap(g(STORAGE_KEYS.exerciseMap)??load(STORAGE_KEYS.exerciseMap,{}));
+      setMuscleOverrides(g(STORAGE_KEYS.muscleOverrides)??load(STORAGE_KEYS.muscleOverrides,{}));
+      setCustomFoods(g(STORAGE_KEYS.customFoods)??load(STORAGE_KEYS.customFoods,{}));
+      const goals_=g(STORAGE_KEYS.goals)??load(STORAGE_KEYS.goals,DEFAULT_GOALS);
+      setGoals(goals_);setDraftCals(String(goals_.calories));setDraftPro(String(goals_.protein_g));setDraftSplit(goals_.carbFatSplit??60);
+      if(src){for(const[k,v]of Object.entries(src))localStorage.setItem(k,JSON.stringify(v));}
+    }
+    loadFromBin().then(remote=>{
+      if(remote&&Object.keys(remote).length>1)applyData(remote);
+      else applyData(null);
+    });
   },[]);
 
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[messages]);
@@ -1141,7 +1172,7 @@ export default function FitLog(){
           <div style={card}>
             <div style={ctitle}>Data</div>
             <div style={{fontSize:14,color:C.muted,marginBottom:14}}>{workouts.length} sessions · {nutrition.length} meals · {bodyweight.length} weigh-ins · {Object.keys(customFoods).length} custom foods</div>
-            <button style={{background:C.redLight,border:`1.5px solid ${C.red}`,borderRadius:12,padding:"13px 16px",color:C.red,fontWeight:700,fontFamily:"inherit",fontSize:15,cursor:"pointer",width:"100%"}} onClick={()=>{if(confirm("Delete ALL data? This cannot be undone.")){setWorkouts([]);setNutrition([]);setBW([]);setTemplates({});setExerciseMap({});setCustomFoods({});Object.values(STORAGE_KEYS).forEach(k=>localStorage.removeItem(k));}}}>Clear All Data</button>
+            <button style={{background:C.redLight,border:`1.5px solid ${C.red}`,borderRadius:12,padding:"13px 16px",color:C.red,fontWeight:700,fontFamily:"inherit",fontSize:15,cursor:"pointer",width:"100%"}} onClick={()=>{if(confirm("Delete ALL data? This cannot be undone.")){setWorkouts([]);setNutrition([]);setBW([]);setTemplates({});setExerciseMap({});setCustomFoods({});Object.values(STORAGE_KEYS).forEach(k=>localStorage.removeItem(k));scheduleBinSync();}}}>Clear All Data</button>
           </div>
         </div>
       )}
