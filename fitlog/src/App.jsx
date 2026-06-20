@@ -1058,7 +1058,7 @@ export default function FitLog(){
           <div ref={bottomRef}/>
         </div>
         <div style={{padding:"12px 14px 24px",display:"flex",gap:10,background:C.surface,borderTop:`1px solid ${C.border}`,flexShrink:0,alignItems:"center",boxShadow:"0 -1px 3px rgba(0,0,0,0.06)"}}>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleImageUpload}/>
+          <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleImageUpload}/>
           <button style={{background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:12,width:46,height:46,cursor:"pointer",fontSize:20,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>fileRef.current?.click()} title="Scan nutrition label">📷</button>
           <input ref={inputRef} style={{flex:1,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"12px 14px",color:C.text,fontSize:16,fontFamily:"inherit",outline:"none"}} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSend()} placeholder="Log food, workout, or ask..."/>
           <button style={{background:C.accent,border:"none",borderRadius:12,width:46,height:46,cursor:"pointer",color:"#fff",fontWeight:700,fontSize:19,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={handleSend}>→</button>
