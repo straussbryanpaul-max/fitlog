@@ -523,7 +523,7 @@ CORE BEHAVIOR
 FOOD LOGGING
 - If a food fuzzy-matches an entry in CUSTOM FOODS below, use \`use_custom_food\` — never re-estimate macros for a custom food.
 - For simple whole foods (plain chicken breast, plain rice, fresh fruit, raw vegetables), estimate from training knowledge and call \`log_food\` directly.
-- For branded, packaged, restaurant, or processed items NOT in custom foods, use web_search to find accurate macros, then call \`log_food\`. Never guess 0 calories.
+- For branded, packaged, restaurant, or processed items NOT in custom foods, estimate macros from your training knowledge and call \`log_food\` directly. Be as accurate as possible — use well-known nutritional data. Never guess 0 calories.
 - When the user provides explicit macros (e.g. "protein bar 190cal 21p 18c 6f"), use those — call \`log_food\` directly.
 - Quantity field: countable foods use piece+unit ("2 eggs", "3 slices"); otherwise servings ("1 cup", "1 serving").
 
@@ -576,7 +576,6 @@ function buildDynamicContext({customFoods,workouts,nutrition,bodyweight,goals,ex
 async function callClaudeAgent(messages,dynamicContext){
   const lastIdx=TOOLS.length-1;
   const tools=[
-    {type:"web_search_20250305",name:"web_search"},
     ...TOOLS.slice(0,lastIdx),
     {...TOOLS[lastIdx],cache_control:{type:"ephemeral"}}
   ];
@@ -989,7 +988,7 @@ export default function FitLog(){
       }
       const toolResults=[];
       for(const tu of toolUses){
-        if(tu.name==="web_search")continue;
+
         toolsFired.push(tu.name);
         const result=dispatchTool(tu.name,tu.input);
         toolResults.push({
