@@ -576,7 +576,7 @@ function buildDynamicContext({customFoods,workouts,nutrition,bodyweight,goals,ex
 async function callClaudeAgent(messages,dynamicContext){
   const lastIdx=TOOLS.length-1;
   const tools=[
-    {type:"web_search_20250305",name:"web_search"},
+    {type:"web_search_20260209",name:"web_search"},
     ...TOOLS.slice(0,lastIdx),
     {...TOOLS[lastIdx],cache_control:{type:"ephemeral"}}
   ];
