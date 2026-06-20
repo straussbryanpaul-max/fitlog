@@ -1,5 +1,5 @@
 export const config = {
-  maxDuration: 60,
+  maxDuration: 30,
 };
 
 export default async function handler(req, res) {
@@ -15,8 +15,14 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Anthropic API error:', JSON.stringify(data));
+    }
+
     return res.status(response.status).json(data);
   } catch (err) {
+    console.error('Proxy error:', err.message);
     return res.status(500).json({ error: { message: err.message || 'API request failed' } });
   }
 }
