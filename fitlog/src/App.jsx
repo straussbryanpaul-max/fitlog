@@ -506,7 +506,7 @@ function buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap){
 }
 
 async function callClaudeImage(base64,mediaType){
-  const res=await fetch("/api/anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string","servingUnit":"string","servingAmount":number}  servingUnit should be the countable unit (pieces, chips, crisps, crackers, cookies, gummies) NOT weight/volume (oz, g, ml, cup). servingAmount is how many of that unit equals one serving (e.g. if serving is 20 pieces, servingAmount=20). If no countable unit exists, use "serving" with servingAmount=1.\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
+  const res=await fetch("/api/anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string","servingUnit":"string","servingAmount":number}  servingUnit should be the countable unit (pieces, chips, crisps, crackers, cookies, gummies) NOT weight/volume (oz, g, ml, cup). servingAmount is how many of that unit equals one serving (e.g. if serving is 20 pieces, servingAmount=20). If no countable unit exists, use "serving" with servingAmount=1.\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
   const data=await res.json();
   const text=data.content?.map(b=>b.text||"").join("")||"{}";
   try{return JSON.parse(text.replace(/```json|```/g,"").trim());}catch{return null;}
@@ -584,7 +584,7 @@ async function callClaudeAgent(messages,dynamicContext){
     method:"POST",
     headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01"},
     body:JSON.stringify({
-      model:"claude-sonnet-4-5",
+      model:"claude-sonnet-4-6",
       max_tokens:1500,
       system:[
         {type:"text",text:COACH_SYSTEM_STATIC,cache_control:{type:"ephemeral"}},
