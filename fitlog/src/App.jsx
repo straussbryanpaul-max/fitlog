@@ -25,8 +25,9 @@ function save(key,data){localStorage.setItem(key,JSON.stringify(data));scheduleB
 const JSONBIN_ID=import.meta.env.VITE_JSONBIN_ID;
 const JSONBIN_KEY=import.meta.env.VITE_JSONBIN_KEY;
 let _syncTimer=null;
+let _binReady=false;
 function scheduleBinSync(){
-  if(!JSONBIN_ID||!JSONBIN_KEY)return;
+  if(!JSONBIN_ID||!JSONBIN_KEY||!_binReady)return;
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
     const payload={};
@@ -676,6 +677,7 @@ export default function FitLog(){
     loadFromBin().then(remote=>{
       if(remote&&Object.keys(remote).length>1)applyData(remote);
       else applyData(null);
+      _binReady=true;
     });
   },[]);
 
