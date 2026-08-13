@@ -22,6 +22,17 @@ function calcMacros(calories,protein_g,carbPct){const rem=Math.max(0,calories-pr
 function load(key,fb){try{return JSON.parse(localStorage.getItem(key))??fb;}catch{return fb;}}
 function save(key,data){localStorage.setItem(key,JSON.stringify(data));scheduleBinSync();}
 
+// Additive merge for array collections keyed by `timestamp` — local wins on
+// conflicts (protects unsynced local entries), remote-only entries are pulled in.
+function mergeArrayByTimestamp(local,remote){
+  const map=new Map();
+  (remote||[]).forEach(item=>{if(item&&item.timestamp!=null)map.set(item.timestamp,item);});
+  (local||[]).forEach(item=>{if(item&&item.timestamp!=null)map.set(item.timestamp,item);});
+  return Array.from(map.values());
+}
+// Shallow merge for object collections (keyed by name/id) — local wins on key conflicts.
+function mergeObject(local,remote){return{...(remote||{}),...(local||{})};}
+
 const JSONBIN_ID=import.meta.env.VITE_JSONBIN_ID;
 const JSONBIN_KEY=import.meta.env.VITE_JSONBIN_KEY;
 let _syncTimer=null;
@@ -33,7 +44,7 @@ function scheduleBinSync(){
     const payload={};
     for(const[,v]of Object.entries(STORAGE_KEYS)){try{const d=localStorage.getItem(v);if(d)payload[v]=JSON.parse(d);}catch{}}
     fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":JSONBIN_KEY},body:JSON.stringify(payload)}).catch(()=>{});
-  },2000);
+  },600);
 }
 async function loadFromBin(){
   if(!JSONBIN_ID||!JSONBIN_KEY)return null;
@@ -506,6 +517,27 @@ function buildDataContext(workouts,nutrition,bodyweight,goals,exerciseMap){
   return`GOALS: ${goals.calories}cal | ${goals.protein_g}g protein\nEXERCISES:\n${Object.entries(exS).map(([n,s])=>{const sorted=s.sort((a,b)=>a.date.localeCompare(b.date));const best=Math.max(...s.map(x=>x.weight));const lat=sorted[sorted.length-1];return`- ${n}: ${s.length} sessions, best=${best}lbs, latest=${lat.weight}lbs on ${lat.date}`;}).join("\n")}\nNUTRITION:\n${Object.entries(nutD).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14).map(([d,x])=>`- ${d}: ${Math.round(x.calories)}cal | ${Math.round(x.protein_g)}g pro`).join("\n")}\nBODYWEIGHT:\n${bodyweight.slice(-14).map(b=>`- ${b.date}: ${b.weight}lbs`).join("\n")||"No data"}`;
 }
 
+function resizeImageToBase64(file,maxDim=1568,quality=0.82){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let{width,height}=img;
+      if(width>maxDim||height>maxDim){
+        const scale=maxDim/Math.max(width,height);
+        width=Math.round(width*scale);height=Math.round(height*scale);
+      }
+      const canvas=document.createElement("canvas");
+      canvas.width=width;canvas.height=height;
+      canvas.getContext("2d").drawImage(img,0,0,width,height);
+      const dataUrl=canvas.toDataURL("image/jpeg",quality);
+      resolve(dataUrl.split(",")[1]);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Couldn't read that image"));};
+    img.src=url;
+  });
+}
 async function callClaudeImage(base64,mediaType){
   const res=await fetch("/api/anthropic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:500,system:`You are a nutrition label scanner. Extract data from the label and return ONLY valid JSON:\n{"name":"product name (be specific)","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"servingSize":"string","servingUnit":"string","servingAmount":number}  servingUnit should be the countable unit (pieces, chips, crisps, crackers, cookies, gummies) NOT weight/volume (oz, g, ml, cup). servingAmount is how many of that unit equals one serving (e.g. if serving is 20 pieces, servingAmount=20). If no countable unit exists, use "serving" with servingAmount=1.\nAll numbers should be per single serving. No markdown, no preamble.`,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"Extract the nutrition info from this label."}]}]})});
   const data=await res.json();
@@ -660,24 +692,45 @@ export default function FitLog(){
   const stateRef=useRef({workouts:[],nutrition:[],bodyweight:[],customFoods:{},templates:{},goals:DEFAULT_GOALS,exerciseMap:{},muscleOverrides:{}});
 
   useEffect(()=>{
+    // Merge remote (cloud) data with whatever's already local instead of overwriting —
+    // if a push from an earlier session hadn't landed yet, blindly applying the remote
+    // snapshot would silently drop anything logged locally since the last successful sync.
     function applyData(src){
-      const g=v=>src?.[v];
-      setWorkouts(g(STORAGE_KEYS.workouts)??load(STORAGE_KEYS.workouts,[]));
-      setWeeklySets(g(STORAGE_KEYS.weeklysets)??load(STORAGE_KEYS.weeklysets,{}));
-      setNutrition(g(STORAGE_KEYS.nutrition)??load(STORAGE_KEYS.nutrition,[]));
-      setBW(g(STORAGE_KEYS.bodyweight)??load(STORAGE_KEYS.bodyweight,[]));
-      setTemplates(g(STORAGE_KEYS.templates)??load(STORAGE_KEYS.templates,{}));
-      setExerciseMap(g(STORAGE_KEYS.exerciseMap)??load(STORAGE_KEYS.exerciseMap,{}));
-      setMuscleOverrides(g(STORAGE_KEYS.muscleOverrides)??load(STORAGE_KEYS.muscleOverrides,{}));
-      setCustomFoods(g(STORAGE_KEYS.customFoods)??load(STORAGE_KEYS.customFoods,{}));
-      const goals_=g(STORAGE_KEYS.goals)??load(STORAGE_KEYS.goals,DEFAULT_GOALS);
+      const arr=(key)=>{const localVal=load(key,[]);return src&&Array.isArray(src[key])?mergeArrayByTimestamp(localVal,src[key]):localVal;};
+      const obj=(key)=>{const localVal=load(key,{});return src&&src[key]&&typeof src[key]==="object"?mergeObject(localVal,src[key]):localVal;};
+      const mergedWorkouts=arr(STORAGE_KEYS.workouts);
+      const mergedWeeklySets=obj(STORAGE_KEYS.weeklysets);
+      const mergedNutrition=arr(STORAGE_KEYS.nutrition);
+      const mergedBW=arr(STORAGE_KEYS.bodyweight);
+      const mergedTemplates=obj(STORAGE_KEYS.templates);
+      const mergedExerciseMap=obj(STORAGE_KEYS.exerciseMap);
+      const mergedMuscleOverrides=obj(STORAGE_KEYS.muscleOverrides);
+      const mergedCustomFoods=obj(STORAGE_KEYS.customFoods);
+      setWorkouts(mergedWorkouts);
+      setWeeklySets(mergedWeeklySets);
+      setNutrition(mergedNutrition);
+      setBW(mergedBW);
+      setTemplates(mergedTemplates);
+      setExerciseMap(mergedExerciseMap);
+      setMuscleOverrides(mergedMuscleOverrides);
+      setCustomFoods(mergedCustomFoods);
+      const goals_=src?.[STORAGE_KEYS.goals]??load(STORAGE_KEYS.goals,DEFAULT_GOALS);
       setGoals(goals_);setDraftCals(String(goals_.calories));setDraftPro(String(goals_.protein_g));setDraftSplit(goals_.carbFatSplit??60);
-      if(src){for(const[k,v]of Object.entries(src))localStorage.setItem(k,JSON.stringify(v));}
+      localStorage.setItem(STORAGE_KEYS.workouts,JSON.stringify(mergedWorkouts));
+      localStorage.setItem(STORAGE_KEYS.weeklysets,JSON.stringify(mergedWeeklySets));
+      localStorage.setItem(STORAGE_KEYS.nutrition,JSON.stringify(mergedNutrition));
+      localStorage.setItem(STORAGE_KEYS.bodyweight,JSON.stringify(mergedBW));
+      localStorage.setItem(STORAGE_KEYS.templates,JSON.stringify(mergedTemplates));
+      localStorage.setItem(STORAGE_KEYS.exerciseMap,JSON.stringify(mergedExerciseMap));
+      localStorage.setItem(STORAGE_KEYS.muscleOverrides,JSON.stringify(mergedMuscleOverrides));
+      localStorage.setItem(STORAGE_KEYS.customFoods,JSON.stringify(mergedCustomFoods));
+      localStorage.setItem(STORAGE_KEYS.goals,JSON.stringify(goals_));
     }
     loadFromBin().then(remote=>{
       if(remote&&Object.keys(remote).length>1)applyData(remote);
       else applyData(null);
       _binReady=true;
+      scheduleBinSync(); // push the merged result back so the cloud catches up on anything it was missing
     });
   },[]);
 
@@ -765,11 +818,11 @@ export default function FitLog(){
     setLoading(true);
     setMessages(prev=>[...prev,{role:"user",content:"📷 [nutrition label photo]"},{role:"assistant",content:"Scanning label...",type:"info"}]);
     try{
-      const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
-      const scanned=await callClaudeImage(base64,file.type||"image/jpeg");
+      const base64=await resizeImageToBase64(file);
+      const scanned=await callClaudeImage(base64,"image/jpeg");
       if(scanned&&scanned.calories){setMessages(prev=>[...prev.slice(0,-1)]);setLabelModal(scanned);}
       else{setMessages(prev=>[...prev.slice(0,-1),{role:"assistant",content:"Couldn't read that label clearly. Try a closer, well-lit photo.",type:"unclear"}]);}
-    }catch{setMessages(prev=>[...prev.slice(0,-1),{role:"assistant",content:"Something went wrong scanning the label.",type:"error"}]);}
+    }catch(err){console.error("Image scan failed:",err);setMessages(prev=>[...prev.slice(0,-1),{role:"assistant",content:"Something went wrong scanning the label.",type:"error"}]);}
     setLoading(false);
   }
 
