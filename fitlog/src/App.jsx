@@ -34,26 +34,42 @@ function mergeArrayByTimestamp(local,remote){
 function mergeObject(local,remote){return{...(remote||{}),...(local||{})};}
 
 const JSONBIN_ID=import.meta.env.VITE_JSONBIN_ID;
+const JSONBIN_NUTRITION_ID=import.meta.env.VITE_JSONBIN_NUTRITION_ID;
 const JSONBIN_KEY=import.meta.env.VITE_JSONBIN_KEY;
 let _syncTimer=null;
 let _binReady=false;
+// Nutrition is synced to its own bin — it's the fastest-growing collection and
+// pushed the combined bin past JSONBin's 100KB free-tier cap (silently, since
+// failed PUTs are swallowed), freezing the cloud backup for weeks unnoticed.
+function putBin(id,payload){
+  return fetch(`https://api.jsonbin.io/v3/b/${id}`,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":JSONBIN_KEY},body:JSON.stringify(payload)}).catch(()=>{});
+}
 function scheduleBinSync(){
   if(!JSONBIN_ID||!JSONBIN_KEY||!_binReady)return;
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
     const payload={};
     for(const[,v]of Object.entries(STORAGE_KEYS)){try{const d=localStorage.getItem(v);if(d)payload[v]=JSON.parse(d);}catch{}}
-    fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":JSONBIN_KEY},body:JSON.stringify(payload)}).catch(()=>{});
+    const nutritionPayload={[STORAGE_KEYS.nutrition]:payload[STORAGE_KEYS.nutrition]};
+    delete payload[STORAGE_KEYS.nutrition];
+    putBin(JSONBIN_ID,payload);
+    if(JSONBIN_NUTRITION_ID)putBin(JSONBIN_NUTRITION_ID,nutritionPayload);
   },600);
 }
-async function loadFromBin(){
-  if(!JSONBIN_ID||!JSONBIN_KEY)return null;
+async function fetchBin(id){
+  if(!id||!JSONBIN_KEY)return null;
   try{
-    const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`,{headers:{"X-Master-Key":JSONBIN_KEY}});
+    const r=await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`,{headers:{"X-Master-Key":JSONBIN_KEY}});
     if(!r.ok)return null;
     const j=await r.json();
     return j.record||null;
   }catch{return null;}
+}
+async function loadFromBin(){
+  if(!JSONBIN_ID||!JSONBIN_KEY)return null;
+  const[main,nutrition]=await Promise.all([fetchBin(JSONBIN_ID),fetchBin(JSONBIN_NUTRITION_ID)]);
+  if(!main&&!nutrition)return null;
+  return{...(main||{}),...(nutrition||{})};
 }
 const MUSCLE_MAP = {
   // chest
